@@ -1,0 +1,178 @@
+@startuml architecture
+
+' ── Styling ────────────────────────────────────────────────────────────────────
+!theme plain
+skinparam backgroundColor #FAFAFA
+skinparam defaultFontName  Helvetica
+skinparam defaultFontSize  12
+skinparam ArrowColor       #546E7A
+skinparam ArrowThickness   1.5
+skinparam Padding          8
+skinparam RoundCorner      12
+skinparam shadowing        false
+
+skinparam node {
+    BackgroundColor #232F3E
+    FontColor       #ffffff
+    BorderColor     #FF9900
+    BorderThickness 2
+}
+
+skinparam component {
+    BackgroundColor #326CE5
+    FontColor       #ffffff
+    BorderColor     #1a4a9e
+}
+
+skinparam database {
+    BackgroundColor #37474F
+    FontColor       #ffffff
+    BorderColor     #78909C
+}
+
+skinparam actor {
+    BackgroundColor #FFF8E1
+    FontColor       #E65100
+    BorderColor     #F9A825
+}
+
+skinparam rectangle {
+    BackgroundColor #E3F2FD
+    FontColor       #0D47A1
+    BorderColor     #42A5F5
+}
+
+skinparam cloud {
+    BackgroundColor #E8EAF6
+    FontColor       #283593
+    BorderColor     #7986CB
+}
+
+' ── Actors ─────────────────────────────────────────────────────────────────────
+actor "Operator" as Operator
+
+' ── AWS Cloud ──────────────────────────────────────────────────────────────────
+cloud "AWS Cloud — us-east-1" as AWS {
+
+    ' ── VPC ──────────────────────────────────────────────────────────────────
+    rectangle "VPC  10.0.0.0/16" as VPC {
+
+        ' ── Internet Gateway ─────────────────────────────────────────────────
+        node "Internet Gateway" as IGW
+
+        ' ── Public subnets ───────────────────────────────────────────────────
+        rectangle "Public Subnets" as PubLayer {
+
+            rectangle "us-east-1a  10.0.1.0/24" as PubA {
+                node "Bastion Host\nt3.micro" as Bastion {
+                    component "Ubuntu 22.04\nPython 3\nSSH ProxyCommand" as BastionOS
+                }
+                node "NAT Gateway\n+ EIP" as NAT
+            }
+
+            rectangle "us-east-1b  10.0.2.0/24" as PubB {
+            }
+        }
+
+        ' ── Private subnets ──────────────────────────────────────────────────
+        rectangle "Private Subnets" as PrivLayer {
+
+            rectangle "us-east-1a  10.0.11.0/24" as PrivA {
+                node "Master Node\nt3.medium" as Master {
+                    component "kube-apiserver  :6443" as APIS
+                    component "etcd  :2379-2380" as ETCD
+                    component "controller-manager  :10252" as CM
+                    component "kube-scheduler  :10251" as SCHED
+                    component "kube-proxy" as KPROXY_M
+                    component "kubelet  :10250" as KUBELET_M
+                    component "containerd (CRI)" as CTR_M
+                    component "calico-node (CNI)" as CAL_M
+                }
+            }
+
+            rectangle "us-east-1b  10.0.12.0/24" as PrivB {
+                node "Worker Auto Scaling Group\nt3.medium × worker_count\n(min: 1 · max: 10)" as Workers {
+                    component "kubelet  :10250" as KUBELET_W
+                    component "kube-proxy" as KPROXY_W
+                    component "containerd (CRI)" as CTR_W
+                    component "calico-node (CNI)" as CAL_W
+                    component "ingress-nginx\n:30080 / :30443" as INGRESS
+                    component "User Pods\n(containers)" as PODS
+                }
+            }
+        }
+    }
+}
+
+' ── Security Groups (annotation) ───────────────────────────────────────────────
+note right of Bastion
+  <b>bastion-sg</b>
+  Inbound:  :22 from ssh_allowed_cidr
+  Outbound: all
+end note
+
+note right of Master
+  <b>master-sg</b>
+  Inbound:  :22 from bastion-sg
+            :6443 from VPC CIDR
+            :2379-2380 from VPC
+            :10250-10252 from VPC
+            :179 BGP from VPC
+            :4789 VXLAN from VPC
+  Outbound: all
+end note
+
+note right of Workers
+  <b>worker-sg</b>
+  Inbound:  :22 from bastion-sg
+            :10250 from VPC
+            :30000-32767 from VPC
+            :179 BGP from VPC
+            :4789 VXLAN from VPC
+  Outbound: all
+end note
+
+' ── Connections ────────────────────────────────────────────────────────────────
+Operator    -[#E65100,thickness=2]->  Bastion  : SSH :22
+Operator    -[#E65100,thickness=2]->  Bastion  : kubectl via SSH tunnel :6443
+Operator    -[#7B1FA2,thickness=2]->  Bastion  : HTTP/S via tunnel :30080/:30443
+Bastion     -[#FF9900]->              Master   : SSH ProxyCommand :22
+Bastion     -[#FF9900]->              Workers  : SSH ProxyCommand :22
+
+IGW         -[#42A5F5]->              Bastion  : inbound
+
+Master      -[#9E9E9E,dashed]->       NAT      : egress (NAT)
+Workers     -[#9E9E9E,dashed]->       NAT      : egress (NAT)
+NAT         -[#9E9E9E,dashed]->       IGW      : ""
+
+Bastion     -[#7B1FA2]->              INGRESS  : :30080 / :30443
+INGRESS     -[#7B1FA2]->              PODS     : routes by host/path
+
+CAL_M       -[#FB8C00,thickness=2]->  CAL_W    : Calico BGP :179\nVXLAN :4789\n192.168.0.0/16
+
+' ── Notes ──────────────────────────────────────────────────────────────────────
+note bottom of Master
+  <b>No IAM roles</b>
+  Minimal lab permissions
+  No cloud-controller-manager
+end note
+
+note bottom of Workers
+  <b>No IAM roles</b>
+  Minimal lab permissions
+  gp2 volumes · 30 GB
+end note
+
+' ── Legend ─────────────────────────────────────────────────────────────────────
+legend right
+  | <#E65100>     | Operator traffic (SSH / kubectl)  |
+  | <#FF9900>     | AWS network path                  |
+  | <#FB8C00>     | Calico pod network                |
+  | <#9E9E9E>     | Egress via NAT                    |
+  | <#7B1FA2>     | Ingress traffic (HTTP/S)           |
+  | <#42A5F5>     | Internet Gateway ingress           |
+endlegend
+
+title k8s-cluster — AWS Architecture\nTerraform + Ansible + kubeadm + Calico + NGINX Ingress\n(Lab config — no NLB, no IAM, single NAT)
+
+@enduml

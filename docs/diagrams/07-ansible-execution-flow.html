@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ansible Complete Interactive Guide — k8s-cluster</title>
+<style>
+  :root {
+    --bg: #FAFAFA; --bg2: #F5F5F5; --bg3: #EEEEEE;
+    --text: #2C2C2A; --text2: #5F5E5A; --text3: #999;
+    --border: #e0e0e0;
+    --purple: #534AB7; --green: #0F6E56; --orange: #854F0B;
+    --red: #993C1D; --pink: #993556; --yellow: #F9A825;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a1a; --bg2: #252525; --bg3: #333;
+      --text: #e0e0e0; --text2: #aaa; --text3: #777;
+      --border: #444;
+    }
+  }
+  * { margin: 0; box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); padding: 2rem; max-width: 800px; margin: 0 auto; }
+  h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 4px; }
+  .subtitle { font-size: 0.9rem; color: var(--text2); margin-bottom: 1.5rem; }
+  code { font-size: 12px; background: var(--bg3); padding: 2px 6px; border-radius: 3px; font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace; }
+
+  /* Tabs */
+  .ag-tabs { display: flex; gap: 2px; border-bottom: 2px solid var(--border); }
+  .ag-tab { padding: 10px 18px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; background: transparent; color: var(--text2); border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s; }
+  .ag-tab:hover { color: var(--text); background: var(--bg2); }
+  .ag-tab.active { color: var(--text); border-bottom-color: var(--purple); font-weight: 600; }
+  .ag-panel { display: none; padding: 1.25rem 0; }
+  .ag-panel.active { display: block; }
+
+  /* Component map */
+  .ag-map { position: relative; }
+  .ag-node { position: absolute; padding: 10px 14px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.25s ease; border: 1.5px solid; text-align: center; line-height: 1.3; user-select: none; }
+  .ag-node:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.12); z-index: 10; }
+  .ag-node.highlight { transform: scale(1.08); box-shadow: 0 0 0 3px rgba(83,74,183,0.3); z-index: 20; }
+  .ag-cat-exec { background: #EEEDFE; border-color: var(--purple); color: #26215C; }
+  .ag-cat-data { background: #E1F5EE; border-color: var(--green); color: #04342C; }
+  .ag-cat-infra { background: #FAECE7; border-color: var(--red); color: #4A1B0C; }
+  .ag-cat-ext { background: #FFF8E1; border-color: var(--yellow); color: #5D4037; }
+  .ag-cat-event { background: #FBEAF0; border-color: var(--pink); color: #4B1528; }
+
+  .ag-detail { margin-top: 12px; padding: 16px 20px; background: var(--bg2); border-radius: 8px; border-left: 3px solid var(--purple); min-height: 100px; }
+  .ag-detail h3 { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
+  .ag-detail .ag-badge { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 10px; margin-left: 8px; font-weight: 500; vertical-align: middle; }
+  .ag-detail p { margin: 0 0 8px; font-size: 13px; line-height: 1.55; color: var(--text2); }
+  .ag-example { background: var(--bg3); padding: 10px 14px; border-radius: 6px; font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace; font-size: 11.5px; white-space: pre; overflow-x: auto; line-height: 1.5; margin-top: 8px; color: var(--text); }
+
+  /* Flow */
+  .ag-flow-step { display: flex; align-items: flex-start; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--border); opacity: 0.4; transition: all 0.5s ease; cursor: pointer; }
+  .ag-flow-step:hover { opacity: 0.8; }
+  .ag-flow-step.active { opacity: 1; }
+  .ag-flow-step.done { opacity: 0.65; }
+  .ag-flow-num { min-width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: white; background: #bbb; transition: background 0.4s; flex-shrink: 0; }
+  .ag-flow-step.active .ag-flow-num { background: var(--purple); }
+  .ag-flow-step.done .ag-flow-num { background: var(--green); }
+  .ag-flow-body h4 { margin: 0 0 3px; font-size: 13.5px; font-weight: 600; }
+  .ag-flow-body p { margin: 0; font-size: 12.5px; color: var(--text2); line-height: 1.5; }
+  .ag-flow-controls { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+  .ag-flow-controls button { padding: 6px 16px; border-radius: 5px; border: 1px solid var(--border); background: var(--bg2); color: var(--text); font-size: 13px; cursor: pointer; }
+  .ag-flow-controls button:hover { background: var(--bg3); }
+  .ag-flow-controls span { font-size: 12px; color: var(--text3); }
+
+  /* Variable precedence */
+  .ag-prec-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; font-size: 12.5px; border-left: 3px solid transparent; transition: all 0.3s; }
+  .ag-prec-item:hover { background: var(--bg2); }
+  .ag-prec-rank { font-weight: 700; color: var(--text3); min-width: 24px; }
+  .ag-prec-bar { height: 6px; border-radius: 3px; transition: width 0.6s ease; }
+  .ag-prec-name { flex: 1; font-weight: 500; }
+  .ag-prec-ex { font-size: 11px; color: var(--text3); font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace; }
+
+  /* Legend */
+  .ag-legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 10px 0 6px; }
+  .ag-legend-item { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text2); }
+  .ag-legend-dot { width: 12px; height: 12px; border-radius: 3px; border: 1px solid; }
+
+  /* Project grid */
+  .ag-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ag-card { padding: 14px; background: var(--bg2); border-radius: 8px; border-left: 3px solid; }
+  .ag-card h4 { font-size: 13px; margin-bottom: 6px; }
+  .ag-card p { font-size: 12px; color: var(--text2); line-height: 1.5; margin: 0; }
+
+  .ag-svg-flow line, .ag-svg-flow path { transition: opacity 0.4s, stroke-width 0.3s; }
+</style>
+
+<h1>Ansible — Complete Interactive Guide</h1>
+<p class="subtitle">All components, execution flow, variable precedence, and project mapping for <code>k8s-cluster</code></p>
+
+<div class="ag-tabs">
+  <button class="ag-tab active" data-tab="map">Components</button>
+  <button class="ag-tab" data-tab="flow">Execution flow</button>
+  <button class="ag-tab" data-tab="vars">Variable precedence</button>
+  <button class="ag-tab" data-tab="project">Your project</button>
+</div>
+
+<!-- TAB 1: COMPONENT MAP -->
+<div class="ag-panel active" data-panel="map">
+  <div class="ag-legend">
+    <div class="ag-legend-item"><div class="ag-legend-dot ag-cat-exec"></div> Execution</div>
+    <div class="ag-legend-item"><div class="ag-legend-dot ag-cat-data"></div> Data / Config</div>
+    <div class="ag-legend-item"><div class="ag-legend-dot ag-cat-infra"></div> Infrastructure</div>
+    <div class="ag-legend-item"><div class="ag-legend-dot ag-cat-ext"></div> External</div>
+    <div class="ag-legend-item"><div class="ag-legend-dot ag-cat-event"></div> Event-driven</div>
+  </div>
+
+  <div class="ag-map" style="height: 360px; margin: 8px 0;">
+    <svg viewBox="0 0 720 360" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;" class="ag-svg-flow">
+      <defs>
+        <marker id="ma" markerWidth="6" markerHeight="5" refX="6" refY="2.5" orient="auto"><path d="M0,0 L6,2.5 L0,5Z" fill="#534AB7" opacity="0.5"/></marker>
+        <marker id="mg" markerWidth="6" markerHeight="5" refX="6" refY="2.5" orient="auto"><path d="M0,0 L6,2.5 L0,5Z" fill="#0F6E56" opacity="0.5"/></marker>
+        <marker id="mr" markerWidth="6" markerHeight="5" refX="6" refY="2.5" orient="auto"><path d="M0,0 L6,2.5 L0,5Z" fill="#993C1D" opacity="0.5"/></marker>
+      </defs>
+      <line x1="155" y1="30" x2="155" y2="75" stroke="#534AB7" stroke-width="1.5" opacity="0.3" marker-end="url(#ma)" data-from="playbook" data-to="play"/>
+      <line x1="155" y1="110" x2="155" y2="155" stroke="#534AB7" stroke-width="1.5" opacity="0.3" marker-end="url(#ma)" data-from="play" data-to="role"/>
+      <line x1="155" y1="190" x2="155" y2="235" stroke="#534AB7" stroke-width="1.5" opacity="0.3" marker-end="url(#ma)" data-from="role" data-to="task"/>
+      <line x1="155" y1="270" x2="155" y2="310" stroke="#534AB7" stroke-width="1.5" opacity="0.3" marker-end="url(#ma)" data-from="task" data-to="module"/>
+      <line x1="390" y1="30" x2="215" y2="82" stroke="#993C1D" stroke-width="1" opacity="0.3" marker-end="url(#mr)" data-from="inventory" data-to="play"/>
+      <line x1="390" y1="100" x2="215" y2="168" stroke="#0F6E56" stroke-width="1" opacity="0.3" marker-end="url(#mg)" data-from="variables" data-to="role"/>
+      <line x1="390" y1="175" x2="215" y2="250" stroke="#0F6E56" stroke-width="1" opacity="0.3" marker-end="url(#mg)" data-from="templates" data-to="task"/>
+      <line x1="550" y1="30" x2="215" y2="90" stroke="#0F6E56" stroke-width="1" opacity="0.3" stroke-dasharray="4,3" marker-end="url(#mg)" data-from="facts" data-to="play"/>
+      <line x1="390" y1="250" x2="215" y2="260" stroke="#993556" stroke-width="1" opacity="0.3" stroke-dasharray="4,3" data-from="handlers" data-to="task"/>
+      <path d="M155,345 L155,355 Q155,360 160,360 L350,360 Q355,360 355,355 L355,345" fill="none" stroke="#534AB7" stroke-width="1" opacity="0.3" data-from="module" data-to="connection"/>
+      <line x1="545" y1="260" x2="545" y2="310" stroke="#993C1D" stroke-width="1.5" opacity="0.3" marker-end="url(#mr)" data-from="connection" data-to="host"/>
+    </svg>
+
+    <div class="ag-node ag-cat-exec" style="left:80px;top:5px;width:150px;" data-id="playbook">Playbook</div>
+    <div class="ag-node ag-cat-exec" style="left:80px;top:80px;width:150px;" data-id="play">Play</div>
+    <div class="ag-node ag-cat-exec" style="left:80px;top:160px;width:150px;" data-id="role">Role</div>
+    <div class="ag-node ag-cat-exec" style="left:80px;top:240px;width:150px;" data-id="task">Task</div>
+    <div class="ag-node ag-cat-exec" style="left:80px;top:315px;width:150px;" data-id="module">Module</div>
+
+    <div class="ag-node ag-cat-infra" style="left:320px;top:5px;width:140px;" data-id="inventory">Inventory</div>
+    <div class="ag-node ag-cat-data" style="left:320px;top:80px;width:140px;" data-id="variables">Variables</div>
+    <div class="ag-node ag-cat-data" style="left:320px;top:155px;width:140px;" data-id="templates">Templates (.j2)</div>
+    <div class="ag-node ag-cat-event" style="left:320px;top:230px;width:140px;" data-id="handlers">Handlers</div>
+    <div class="ag-node ag-cat-infra" style="left:320px;top:305px;width:140px;" data-id="connection">Connection</div>
+
+    <div class="ag-node ag-cat-data" style="left:500px;top:5px;width:120px;" data-id="facts">Facts</div>
+    <div class="ag-node ag-cat-ext" style="left:500px;top:80px;width:120px;" data-id="plugins">Plugins</div>
+    <div class="ag-node ag-cat-ext" style="left:500px;top:155px;width:120px;" data-id="galaxy">Galaxy</div>
+    <div class="ag-node ag-cat-data" style="left:500px;top:230px;width:120px;" data-id="vault">Vault</div>
+    <div class="ag-node ag-cat-infra" style="left:480px;top:305px;width:160px;" data-id="host">Remote Host</div>
+  </div>
+
+  <div class="ag-detail" id="detail-panel">
+    <h3>Click any component</h3>
+    <p>Each box is an Ansible building block. Click one to see what it does, how it fits, and a real example from your project.</p>
+  </div>
+</div>
+
+<!-- TAB 2: EXECUTION FLOW -->
+<div class="ag-panel" data-panel="flow">
+  <div class="ag-flow-controls">
+    <button id="flow-play">&#9654; Auto-play</button>
+    <button id="flow-reset">Reset</button>
+    <span id="flow-status"></span>
+  </div>
+  <div id="flow-steps">
+    <div class="ag-flow-step" data-step="0">
+      <div class="ag-flow-num">1</div>
+      <div class="ag-flow-body">
+        <h4>Parse playbook</h4>
+        <p>Ansible reads <code>site.yml</code>, validates YAML syntax, and builds an ordered list of plays. Each play declares which hosts to target and which roles to apply.</p>
+      </div>
+    </div>
+    <div class="ag-flow-step" data-step="1">
+      <div class="ag-flow-num">2</div>
+      <div class="ag-flow-body">
+        <h4>Load inventory + config</h4>
+        <p>Reads <code>ansible.cfg</code> for settings (SSH pipelining, fact caching, forks). Parses <code>hosts.ini</code> to build the host list with connection params, groups, and group_vars.</p>
+      </div>
+    </div>
+    <div class="ag-flow-step" data-step="2">
+      <div class="ag-flow-num">3</div>
+      <div class="ag-flow-body">
+        <h4>Gather facts (smart)</h4>
+        <p>For each target host, Ansible checks the fact cache. If fresh (<code>fact_caching_timeout</code>), reuses cached facts. Otherwise, SSHs in and runs the <code>setup</code> module to collect OS, IP, CPU, memory info.</p>
+      </div>
+    </div>
+    <div class="ag-flow-step" data-step="3">
+      <div class="ag-flow-num">4</div>
+      <div class="ag-flow-body">
+        <h4>Merge variables</h4>
+        <p>Ansible merges variables from all sources (22 levels). From lowest to highest: role defaults &rarr; inventory vars &rarr; group_vars &rarr; host_vars &rarr; play vars &rarr; role vars &rarr; task vars &rarr; extra vars (<code>-e</code>). Higher wins.</p>
+      </div>
+    </div>
+    <div class="ag-flow-step" data-step="4">
+      <div class="ag-flow-num">5</div>
+      <div class="ag-flow-body">
+        <h4>Execute roles &rarr; tasks</h4>
+        <p>Each role's <code>tasks/main.yml</code> runs in order. Every task calls exactly one module. Jinja2 templates are rendered with merged variables. <code>when:</code> conditions are evaluated to skip tasks.</p>
+      </div>
+    </div>
+    <div class="ag-flow-step" data-step="5">
+      <div class="ag-flow-num">6</div>
+      <div class="ag-flow-body">
+        <h4>Module execution on remote</h4>
+        <p>Ansible generates a Python script from the module + args, transfers it via SSH (through bastion ProxyCommand), executes it on the remote host, and collects the JSON result: <code>ok</code>, <code>changed</code>, or <code>failed</code>.</p>
+      </div>
+    </div>
+    <div class="ag-flow-step" data-step="6">
+      <div class="ag-flow-num">7</div>
+      <div class="ag-flow-body">
+        <h4>Register + conditionals</h4>
+        <p>Task results are captured with <code>register:</code>. Later tasks use <code>when: result.rc != 0</code> to branch. This is how your master role checks if kubeadm already ran &mdash; <code>stat</code> on admin.conf, skip init if it exists.</p>
+      </div>
+    </div>
+    <div class="ag-flow-step" data-step="7">
+      <div class="ag-flow-num">8</div>
+      <div class="ag-flow-body">
+        <h4>Handlers fire at end of play</h4>
+        <p>Tasks that changed state can <code>notify:</code> a handler. Handlers are deferred &mdash; they run once at the end of the play, even if notified multiple times. Example: <code>restart containerd</code> runs once after all config changes.</p>
+      </div>
+    </div>
+    <div class="ag-flow-step" data-step="8">
+      <div class="ag-flow-num">9</div>
+      <div class="ag-flow-body">
+        <h4>Next play or finish</h4>
+        <p>After all tasks + handlers complete for a play, Ansible moves to the next play (common &rarr; master &rarr; workers &rarr; ingress). When all 4 plays finish, the recap shows ok/changed/failed per host.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 3: VARIABLE PRECEDENCE -->
+<div class="ag-panel" data-panel="vars">
+  <p style="font-size:13px;color:var(--text2);margin-bottom:14px;">Higher = wins when the same variable is defined at multiple levels. Hover to highlight.</p>
+  <div>
+    <div class="ag-prec-item" style="border-left-color:#993C1D;">
+      <span class="ag-prec-rank">#1</span>
+      <div style="width:100%"><div class="ag-prec-bar" style="width:100%;background:#993C1D;"></div></div>
+      <span class="ag-prec-name">Extra vars (-e)</span>
+      <span class="ag-prec-ex">-e "k8s_ver=1.30"</span>
+    </div>
+    <div class="ag-prec-item" style="border-left-color:#854F0B;">
+      <span class="ag-prec-rank">#2</span>
+      <div style="width:100%"><div class="ag-prec-bar" style="width:90%;background:#854F0B;"></div></div>
+      <span class="ag-prec-name">Task vars</span>
+      <span class="ag-prec-ex">vars: in task block</span>
+    </div>
+    <div class="ag-prec-item" style="border-left-color:#854F0B;">
+      <span class="ag-prec-rank">#3</span>
+      <div style="width:100%"><div class="ag-prec-bar" style="width:82%;background:#854F0B;"></div></div>
+      <span class="ag-prec-name">Role vars</span>
+      <span class="ag-prec-ex">roles/common/vars/</span>
+    </div>
+    <div class="ag-prec-item" style="border-left-color:#534AB7;">
+      <span class="ag-prec-rank">#4</span>
+      <div style="width:100%"><div class="ag-prec-bar" style="width:72%;background:#534AB7;"></div></div>
+      <span class="ag-prec-name">Play vars</span>
+      <span class="ag-prec-ex">vars: in play</span>
+    </div>
+    <div class="ag-prec-item" style="border-left-color:#534AB7;">
+      <span class="ag-prec-rank">#5</span>
+      <div style="width:100%"><div class="ag-prec-bar" style="width:62%;background:#534AB7;"></div></div>
+      <span class="ag-prec-name">Host vars</span>
+      <span class="ag-prec-ex">host_vars/master-1.yml</span>
+    </div>
+    <div class="ag-prec-item" style="border-left-color:#0F6E56;">
+      <span class="ag-prec-rank">#6</span>
+      <div style="width:100%"><div class="ag-prec-bar" style="width:52%;background:#0F6E56;"></div></div>
+      <span class="ag-prec-name">Group vars</span>
+      <span class="ag-prec-ex">group_vars/all.yml</span>
+    </div>
+    <div class="ag-prec-item" style="border-left-color:#0F6E56;">
+      <span class="ag-prec-rank">#7</span>
+      <div style="width:100%"><div class="ag-prec-bar" style="width:40%;background:#0F6E56;"></div></div>
+      <span class="ag-prec-name">Inventory vars</span>
+      <span class="ag-prec-ex">[k8s_cluster:vars] in hosts.ini</span>
+    </div>
+    <div class="ag-prec-item" style="border-left-color:#999;">
+      <span class="ag-prec-rank">#8</span>
+      <div style="width:100%"><div class="ag-prec-bar" style="width:25%;background:#999;"></div></div>
+      <span class="ag-prec-name">Role defaults</span>
+      <span class="ag-prec-ex">roles/ingress/defaults/main.yml</span>
+    </div>
+  </div>
+  <p style="font-size:12px;color:var(--text3);margin-top:12px;line-height:1.5;"><strong>Your project uses 3 levels:</strong> Role defaults (ingress ports), group_vars/all.yml (k8s version, CIDRs), and inventory vars (pod_cidr, service_cidr from Terraform). This keeps things simple &mdash; no conflicts.</p>
+</div>
+
+<!-- TAB 4: YOUR PROJECT -->
+<div class="ag-panel" data-panel="project">
+  <div class="ag-grid">
+    <div class="ag-card" style="border-left-color:#534AB7;">
+      <h4>site.yml (Playbook)</h4>
+      <p>
+        Play 1: <code>common</code> &rarr; all nodes<br>
+        Play 2: <code>master</code> &rarr; masters[0]<br>
+        Play 3: <code>worker</code> &rarr; workers (serial:1)<br>
+        Play 4: <code>ingress</code> &rarr; masters[0]
+      </p>
+    </div>
+    <div class="ag-card" style="border-left-color:#993C1D;">
+      <h4>Inventory (Terraform-generated)</h4>
+      <p>
+        [bastion] &rarr; SSH jump host<br>
+        [masters] &rarr; control plane<br>
+        [workers] &rarr; data plane<br>
+        ProxyCommand for private IPs
+      </p>
+    </div>
+    <div class="ag-card" style="border-left-color:#0F6E56;">
+      <h4>Roles (4 total)</h4>
+      <p>
+        <code>common</code> &mdash; containerd, kubeadm, kubelet<br>
+        <code>master</code> &mdash; kubeadm init, Calico CNI<br>
+        <code>worker</code> &mdash; kubeadm join<br>
+        <code>ingress</code> &mdash; Helm + nginx-ingress
+      </p>
+    </div>
+    <div class="ag-card" style="border-left-color:#854F0B;">
+      <h4>Key modules used</h4>
+      <p>
+        <code>apt</code> &mdash; install packages<br>
+        <code>command/shell</code> &mdash; kubeadm, kubectl<br>
+        <code>template</code> &mdash; kubeadm-config.yaml<br>
+        <code>stat</code> &mdash; idempotency guards<br>
+        <code>copy</code> &mdash; kubeconfig setup
+      </p>
+    </div>
+    <div class="ag-card" style="border-left-color:#993556;">
+      <h4>Handlers</h4>
+      <p>
+        <code>restart containerd</code><br>
+        <code>restart kubelet</code><br>
+        Triggered by config changes,<br>run once at end of play
+      </p>
+    </div>
+    <div class="ag-card" style="border-left-color:#F9A825;">
+      <h4>Plugins in use</h4>
+      <p>
+        <code>jsonfile</code> &mdash; fact caching<br>
+        <code>ssh</code> &mdash; connection plugin<br>
+        <code>yaml</code> &mdash; stdout callback<br>
+        <code>aws_ec2</code> &mdash; dynamic inventory
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+// Tab switching
+document.querySelectorAll('.ag-tab').forEach(function(tab) {
+  tab.addEventListener('click', function() {
+    document.querySelectorAll('.ag-tab').forEach(function(t){ t.classList.remove('active'); });
+    document.querySelectorAll('.ag-panel').forEach(function(p){ p.classList.remove('active'); });
+    tab.classList.add('active');
+    document.querySelector('[data-panel="'+tab.dataset.tab+'"]').classList.add('active');
+  });
+});
+
+// Component detail data
+var components = {
+  playbook: {
+    title: 'Playbook', cat: 'Execution', catColor: '#534AB7',
+    desc: 'The top-level YAML file that defines your entire automation. A playbook contains one or more <strong>plays</strong> executed in order. Think of it as the "main()" of Ansible.',
+    example: '# site.yml — your playbook has 4 plays\n- name: Common setup\n  hosts: k8s_cluster\n  roles: [common]\n\n- name: Initialize master\n  hosts: masters[0]\n  roles: [master]'
+  },
+  play: {
+    title: 'Play', cat: 'Execution', catColor: '#534AB7',
+    desc: 'A play maps a <strong>set of hosts</strong> to a <strong>set of roles/tasks</strong>. Each play runs independently — it targets specific hosts from the inventory and applies the listed roles.',
+    example: '- name: Deploy NGINX Ingress   # play name\n  hosts: masters[0]            # target host(s)\n  become: true                 # run as root\n  roles:\n    - ingress                  # role to apply'
+  },
+  role: {
+    title: 'Role', cat: 'Execution', catColor: '#534AB7',
+    desc: 'A reusable, self-contained unit of automation with a fixed directory structure. A role bundles tasks, handlers, defaults, templates, and files into one package. Your project has 4 roles: common, master, worker, ingress.',
+    example: 'roles/common/\n  tasks/main.yml      # what to do\n  handlers/main.yml   # event reactions\n  defaults/main.yml   # default variables\n  templates/          # Jinja2 configs\n  files/              # static files'
+  },
+  task: {
+    title: 'Task', cat: 'Execution', catColor: '#534AB7',
+    desc: 'A single action that calls exactly one <strong>module</strong>. Tasks run in order within a role. Each task is idempotent — it checks current state before making changes. Tasks can use <code>when:</code>, <code>register:</code>, <code>retries:</code>, and <code>notify:</code>.',
+    example: '- name: Install containerd      # human label\n  apt:                          # module\n    name: containerd.io          # module arg\n    state: present               # desired state\n  notify: restart containerd     # trigger handler'
+  },
+  module: {
+    title: 'Module', cat: 'Execution', catColor: '#534AB7',
+    desc: 'The actual executor — a Python script that performs one specific action. Modules are shipped with Ansible (2,800+ built-in). They run on the remote host, check state, make changes if needed, and return JSON results.',
+    example: 'Common modules in your project:\n  apt       → install/remove packages\n  command   → run a command (kubeadm)\n  shell     → run via /bin/sh (pipes ok)\n  template  → render .j2 → remote file\n  stat      → check if file exists\n  copy      → copy file to remote\n  file      → set permissions/ownership'
+  },
+  inventory: {
+    title: 'Inventory', cat: 'Infrastructure', catColor: '#993C1D',
+    desc: 'Defines <strong>which machines</strong> Ansible manages. Lists hosts, groups them, and sets connection params (IP, SSH key, ProxyCommand). Your inventory is generated by Terraform so it always matches your infrastructure.',
+    example: '[masters]\nmaster-1 ansible_host=10.0.11.157 \\\n  ansible_ssh_common_args=\'-o ProxyCommand=\\\n  "ssh -i /tmp/k8s-cluster.pem -W %h:%p \\\n  ubuntu@<bastion-ip>"\'\n\n[k8s_cluster:children]\nmasters\nworkers'
+  },
+  variables: {
+    title: 'Variables', cat: 'Data / Config', catColor: '#0F6E56',
+    desc: 'Key-value pairs that parameterize your automation. Variables come from 22 possible sources (see Variable Precedence tab). Your project primarily uses <code>group_vars/all.yml</code> and role <code>defaults/main.yml</code>.',
+    example: '# group_vars/all.yml\nkubernetes_version: "1.29"\npod_cidr: "192.168.0.0/16"\nservice_cidr: "10.96.0.0/12"\ncontainerd_version: "1.7.27-1"\ningress_http_nodeport: 30080'
+  },
+  templates: {
+    title: 'Templates', cat: 'Data / Config', catColor: '#0F6E56',
+    desc: 'Jinja2 files (.j2) that get rendered with variables and copied to the remote host. Templates let you generate config files dynamically — different values per host or environment.',
+    example: '# kubeadm-config.yaml.j2\napiVersion: kubeadm.k8s.io/v1beta3\nkind: ClusterConfiguration\nkubernetesVersion: "{{ kubernetes_version }}"\nnetworking:\n  podSubnet: "{{ pod_cidr }}"\n  serviceSubnet: "{{ service_cidr }}"'
+  },
+  handlers: {
+    title: 'Handlers', cat: 'Event-driven', catColor: '#993556',
+    desc: 'Special tasks that only run when <strong>notified</strong> by another task. They are deferred to the end of the play and deduplicated — even if 5 tasks notify "restart containerd", it only restarts once.',
+    example: '# handlers/main.yml\n- name: restart containerd\n  systemd:\n    name: containerd\n    state: restarted\n    daemon_reload: yes\n\n# triggered by:\n  notify: restart containerd'
+  },
+  connection: {
+    title: 'Connection plugin', cat: 'Infrastructure', catColor: '#993C1D',
+    desc: 'Determines <strong>how</strong> Ansible talks to remote hosts. Default is SSH (paramiko or OpenSSH). Your project uses SSH with ProxyCommand through the bastion host to reach private-subnet nodes.',
+    example: '# ansible.cfg\n[defaults]\ntransport = ssh\n\n[ssh_connection]\npipelining = True\nssh_args = -o ControlMaster=auto \\\n  -o ControlPersist=60s'
+  },
+  facts: {
+    title: 'Facts', cat: 'Data / Config', catColor: '#0F6E56',
+    desc: 'Auto-discovered info about remote hosts: IP addresses, OS, CPU count, memory, disk, network interfaces. Gathered by the setup module at play start. Cached to disk to avoid re-gathering on every run.',
+    example: '# Accessed as variables:\nansible_hostname    → "master-1"\nansible_default_ipv4.address → "10.0.11.157"\nansible_os_family   → "Debian"\nansible_memtotal_mb → 3944\n\n# Cache: /tmp/ansible_facts_cache/'
+  },
+  plugins: {
+    title: 'Plugins', cat: 'External', catColor: '#F9A825',
+    desc: 'Extend Ansible\'s core behavior without modifying source code. Types: <strong>connection</strong> (SSH, WinRM), <strong>callback</strong> (output format), <strong>inventory</strong> (dynamic sources), <strong>lookup</strong> (external data), <strong>filter</strong> (Jinja2 transforms).',
+    example: 'Plugins in your project:\n  jsonfile  → cache facts to disk\n  ssh       → connect via OpenSSH\n  yaml      → pretty-print output\n  aws_ec2   → dynamic inventory from AWS'
+  },
+  galaxy: {
+    title: 'Ansible Galaxy', cat: 'External', catColor: '#F9A825',
+    desc: 'A public registry of community-shared roles and collections. Instead of writing everything from scratch, you can install pre-built roles. Your project writes its own roles, but could pull in community roles for common patterns.',
+    example: '# Install a role from Galaxy:\nansible-galaxy install geerlingguy.docker\n\n# Install a collection:\nansible-galaxy collection install \\\n  kubernetes.core\n\n# Use in playbook:\nroles:\n  - geerlingguy.docker'
+  },
+  vault: {
+    title: 'Ansible Vault', cat: 'Data / Config', catColor: '#0F6E56',
+    desc: 'Encrypts sensitive data (passwords, keys, tokens) so you can safely commit them to version control. Your project doesn\'t use Vault yet — SSH keys are generated by Terraform and kept out of git via .gitignore.',
+    example: '# Encrypt a file:\nansible-vault encrypt secrets.yml\n\n# Use in playbook:\nvars_files:\n  - secrets.yml\n\n# Run with vault password:\nansible-playbook site.yml \\\n  --ask-vault-pass'
+  },
+  host: {
+    title: 'Remote Host', cat: 'Infrastructure', catColor: '#993C1D',
+    desc: 'The target machine where modules execute. Ansible is agentless — nothing needs to be pre-installed except Python 3 and SSH. Your hosts are EC2 instances (Ubuntu 22.04) in private subnets, reached via bastion ProxyCommand.',
+    example: 'Your hosts:\n  bastion  → t3.micro, public subnet\n  master-1 → t3.medium, private 10.0.11.x\n  worker-* → t3.medium, private 10.0.12.x\n\nRequirements: Python 3, SSH access\nNo agent installed on remote hosts'
+  }
+};
+
+// Component click
+document.querySelectorAll('.ag-node').forEach(function(node) {
+  node.addEventListener('click', function(e) {
+    e.stopPropagation();
+    var id = node.dataset.id;
+    var c = components[id];
+    if (!c) return;
+    document.querySelectorAll('.ag-node').forEach(function(n){ n.classList.remove('highlight'); });
+    node.classList.add('highlight');
+    document.querySelectorAll('.ag-svg-flow line, .ag-svg-flow path').forEach(function(line) {
+      var from = line.getAttribute('data-from');
+      var to = line.getAttribute('data-to');
+      if (from === id || to === id) {
+        line.setAttribute('opacity', '0.9');
+        line.setAttribute('stroke-width', '2.5');
+      } else {
+        line.setAttribute('opacity', '0.15');
+        line.setAttribute('stroke-width', '1');
+      }
+    });
+    var panel = document.getElementById('detail-panel');
+    panel.innerHTML = '<h3>' + c.title + '<span class="ag-badge" style="background:'+c.catColor+'22;color:'+c.catColor+'">' + c.cat + '</span></h3><p>' + c.desc + '</p><div class="ag-example">' + c.example + '</div>';
+  });
+});
+
+document.querySelector('.ag-map').addEventListener('click', function(e) {
+  if (!e.target.closest('.ag-node')) {
+    document.querySelectorAll('.ag-node').forEach(function(n){ n.classList.remove('highlight'); });
+    document.querySelectorAll('.ag-svg-flow line, .ag-svg-flow path').forEach(function(l) {
+      l.setAttribute('opacity', '0.3');
+      l.setAttribute('stroke-width', parseFloat(l.getAttribute('stroke-width')) > 1.2 ? '1.5' : '1');
+    });
+  }
+});
+
+// Flow auto-play
+var flowCurrent = -1, flowTimer = null, flowPlaying = false;
+var flowSteps = document.querySelectorAll('.ag-flow-step');
+
+function flowReset() {
+  clearInterval(flowTimer); flowPlaying = false; flowCurrent = -1;
+  document.getElementById('flow-play').innerHTML = '&#9654; Auto-play';
+  document.getElementById('flow-status').textContent = '';
+  flowSteps.forEach(function(s) { s.classList.remove('active','done'); });
+}
+
+function flowAdvance() {
+  flowCurrent++;
+  if (flowCurrent >= flowSteps.length) {
+    clearInterval(flowTimer); flowPlaying = false;
+    document.getElementById('flow-play').innerHTML = '&#9654; Replay';
+    document.getElementById('flow-status').textContent = 'Complete';
+    return;
+  }
+  flowSteps.forEach(function(s, i) {
+    s.classList.remove('active','done');
+    if (i < flowCurrent) s.classList.add('done');
+    if (i === flowCurrent) s.classList.add('active');
+  });
+  document.getElementById('flow-status').textContent = (flowCurrent+1) + ' / ' + flowSteps.length;
+}
+
+document.getElementById('flow-play').addEventListener('click', function() {
+  if (flowPlaying) { clearInterval(flowTimer); flowPlaying = false; this.innerHTML = '&#9654; Resume'; return; }
+  if (flowCurrent >= flowSteps.length - 1) flowReset();
+  flowPlaying = true; this.innerHTML = '&#9208; Pause';
+  flowAdvance(); flowTimer = setInterval(flowAdvance, 2800);
+});
+document.getElementById('flow-reset').addEventListener('click', flowReset);
+
+flowSteps.forEach(function(step, idx) {
+  step.addEventListener('click', function() {
+    clearInterval(flowTimer); flowPlaying = false;
+    document.getElementById('flow-play').innerHTML = '&#9654; Resume';
+    flowCurrent = idx;
+    flowSteps.forEach(function(s, i) {
+      s.classList.remove('active','done');
+      if (i < idx) s.classList.add('done');
+      if (i === idx) s.classList.add('active');
+    });
+    document.getElementById('flow-status').textContent = (idx+1) + ' / ' + flowSteps.length;
+  });
+});
+</script>
+</body>
+</html>

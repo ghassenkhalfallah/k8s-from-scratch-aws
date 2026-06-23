@@ -1,0 +1,61 @@
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#232F3E", "primaryTextColor": "#ffffff", "primaryBorderColor": "#FF9900", "lineColor": "#FF9900", "secondaryColor": "#1a4a9e", "tertiaryColor": "#f0f0f0"}}}%%
+
+graph TB
+    %% ── External ─────────────────────────────────────────────────────────────
+    Operator(["👤 Operator\nSSH / Terraform"])
+    Internet(["🌐 Internet"])
+
+    %% ── AWS Global ───────────────────────────────────────────────────────────
+    subgraph AWS["☁  AWS Cloud — us-east-1"]
+        IGW["🔀 Internet Gateway"]
+
+        subgraph VPC["VPC  10.0.0.0/16"]
+
+            subgraph PubA["Public Subnet A · 10.0.1.0/24 · us-east-1a"]
+                Bastion["🔑 Bastion Host\nt3.micro · Ubuntu 22.04\n────────────────\nSingle SSH entry-point"]
+                NAT["📡 NAT Gateway\n+ Elastic IP"]
+            end
+
+            subgraph PubB["Public Subnet B · 10.0.2.0/24 · us-east-1b"]
+            end
+
+            subgraph PrivA["Private Subnet A · 10.0.11.0/24 · us-east-1a"]
+                Master["🖥  Master Node\nt3.medium · Ubuntu 22.04\n─────────────────────\nkubeadm  · API Server\netcd  · Controller Manager\nScheduler  · Calico"]
+            end
+
+            subgraph PrivB["Private Subnet B · 10.0.12.0/24 · us-east-1b"]
+                Workers["⚙  Worker Auto Scaling Group\nt3.medium × worker_count\n─────────────────────\ncontainerd  · kubelet\nkube-proxy  · Calico\ningress-nginx :30080/:30443"]
+            end
+
+        end
+    end
+
+    %% ── Connections ──────────────────────────────────────────────────────────
+    Operator -- "SSH :22" --> Internet
+
+    Internet --> IGW
+
+    IGW <-- "SSH :22 ↔" --> Bastion
+
+    Bastion -- "SSH :22\n(ProxyCommand)" --> Master
+    Bastion -- "SSH :22\n(ProxyCommand)" --> Workers
+
+    Master <-- "Pod network\n192.168.0.0/16\nCalico BGP" --> Workers
+
+    Master -- "egress\n(apt / images)" --> NAT
+    Workers -- "egress\n(apt / images)" --> NAT
+
+    NAT --> IGW
+
+    %% ── Styles ───────────────────────────────────────────────────────────────
+    classDef awsOrange  fill:#FF9900,stroke:#232F3E,color:#232F3E,font-weight:bold
+    classDef k8sBlue    fill:#326CE5,stroke:#1a4a9e,color:#ffffff,font-weight:bold
+    classDef infra      fill:#37474F,stroke:#78909C,color:#ffffff
+    classDef subnet     fill:#E8F5E9,stroke:#66BB6A,color:#1B5E20
+    classDef pubsubnet  fill:#E3F2FD,stroke:#42A5F5,color:#0D47A1
+    classDef external   fill:#FFF8E1,stroke:#FFA726,color:#E65100
+
+    class Bastion,NAT,IGW awsOrange
+    class Master k8sBlue
+    class Workers k8sBlue
+    class Operator,Internet external

@@ -1,0 +1,263 @@
+<svg viewBox="0 0 780 920" xmlns="http://www.w3.org/2000/svg" role="img" style="background:transparent">
+  <title>Ansible Architecture Reference</title>
+  <desc>A comprehensive diagram showing how Ansible components relate: inventory, playbooks, plays, roles, tasks, modules, plugins, handlers, templates, variables, and facts.</desc>
+
+  <style>
+    text { font-family: system-ui, -apple-system, sans-serif; }
+    .title { font-size: 18px; font-weight: 700; fill: #1a1a1a; }
+    .subtitle { font-size: 11px; fill: #666; }
+    .box-label { font-size: 13px; font-weight: 600; fill: #fff; }
+    .box-sub { font-size: 10px; fill: rgba(255,255,255,0.85); }
+    .note { font-size: 10px; fill: #666; }
+    .note-bold { font-size: 10px; font-weight: 600; fill: #1a1a1a; }
+    .section-label { font-size: 12px; font-weight: 700; fill: #1a1a1a; text-transform: uppercase; letter-spacing: 1px; }
+    .arrow { stroke: #ccc; stroke-width: 1.5; fill: none; marker-end: url(#arrowhead); }
+    .arrow-bold { stroke: #326CE5; stroke-width: 2; fill: none; marker-end: url(#arrowhead-blue); }
+    .connector { stroke: #ccc; stroke-width: 1; stroke-dasharray: 4,3; fill: none; }
+    .legend-text { font-size: 10px; fill: #666; }
+  </style>
+
+  <defs>
+    <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#ccc"/>
+    </marker>
+    <marker id="arrowhead-blue" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#326CE5"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="390" y="30" text-anchor="middle" class="title">Ansible — How Everything Connects</text>
+  <text x="390" y="46" text-anchor="middle" class="subtitle">From inventory to execution on remote hosts</text>
+
+  <!-- ═══════════ CONTROL NODE (left) ═══════════ -->
+  <text x="30" y="80" class="section-label">Control Node (your machine)</text>
+
+  <!-- ansible.cfg -->
+  <rect x="30" y="92" width="160" height="50" rx="6" fill="#546E7A"/>
+  <text x="110" y="113" text-anchor="middle" class="box-label">ansible.cfg</text>
+  <text x="110" y="127" text-anchor="middle" class="box-sub">Global settings + SSH config</text>
+
+  <!-- Inventory -->
+  <rect x="220" y="92" width="160" height="50" rx="6" fill="#E65100"/>
+  <text x="300" y="113" text-anchor="middle" class="box-label">Inventory</text>
+  <text x="300" y="127" text-anchor="middle" class="box-sub">hosts.ini / aws_ec2.yml</text>
+
+  <!-- Inventory details -->
+  <rect x="420" y="80" width="340" height="75" rx="6" fill="#f5f5f5" stroke="#ddd" stroke-width="1"/>
+  <text x="435" y="97" class="note-bold">Inventory defines:</text>
+  <text x="435" y="112" class="note">• Hosts — IP addresses of target machines</text>
+  <text x="435" y="125" class="note">• Groups — [masters], [workers], [k8s_cluster:children]</text>
+  <text x="435" y="138" class="note">• Host/group vars — ansible_user, ansible_ssh_key, etc.</text>
+  <line x1="380" y1="117" x2="420" y2="117" class="connector"/>
+
+  <!-- ═══════════ PLAYBOOK ═══════════ -->
+  <text x="30" y="185" class="section-label">Playbook (site.yml)</text>
+
+  <!-- Playbook box -->
+  <rect x="30" y="197" width="350" height="50" rx="6" fill="#326CE5"/>
+  <text x="205" y="218" text-anchor="middle" class="box-label">Playbook</text>
+  <text x="205" y="232" text-anchor="middle" class="box-sub">Ordered list of Plays — the main entry point</text>
+
+  <!-- Playbook note -->
+  <rect x="420" y="192" width="340" height="60" rx="6" fill="#f5f5f5" stroke="#ddd" stroke-width="1"/>
+  <text x="435" y="209" class="note-bold">site.yml in your project:</text>
+  <text x="435" y="224" class="note">Play 1: common → all nodes    Play 3: worker → workers</text>
+  <text x="435" y="239" class="note">Play 2: master → masters[0]   Play 4: ingress → masters[0]</text>
+  <line x1="380" y1="222" x2="420" y2="222" class="connector"/>
+
+  <!-- Arrow from cfg + inventory to playbook -->
+  <line x1="110" y1="142" x2="110" y2="197" class="arrow"/>
+  <line x1="300" y1="142" x2="300" y2="197" class="arrow"/>
+
+  <!-- ═══════════ PLAYS ═══════════ -->
+  <text x="30" y="290" class="section-label">Plays</text>
+
+  <rect x="30" y="302" width="160" height="55" rx="6" fill="#1565C0"/>
+  <text x="110" y="322" text-anchor="middle" class="box-label">Play</text>
+  <text x="110" y="337" text-anchor="middle" class="box-sub">hosts: + roles: or tasks:</text>
+  <text x="110" y="349" text-anchor="middle" class="box-sub">become: true (sudo)</text>
+
+  <rect x="220" y="302" width="160" height="55" rx="6" fill="#1565C0"/>
+  <text x="300" y="322" text-anchor="middle" class="box-label">Play</text>
+  <text x="300" y="337" text-anchor="middle" class="box-sub">Maps roles → host groups</text>
+  <text x="300" y="349" text-anchor="middle" class="box-sub">serial: 1 (one at a time)</text>
+
+  <!-- Play note -->
+  <rect x="420" y="297" width="340" height="65" rx="6" fill="#f5f5f5" stroke="#ddd" stroke-width="1"/>
+  <text x="435" y="314" class="note-bold">A Play connects WHAT to run with WHERE:</text>
+  <text x="435" y="329" class="note">• hosts: which group from inventory</text>
+  <text x="435" y="342" class="note">• roles: which roles to apply</text>
+  <text x="435" y="355" class="note">• become: run as root (sudo)</text>
+  <line x1="380" y1="330" x2="420" y2="330" class="connector"/>
+
+  <!-- Arrow from playbook to plays -->
+  <line x1="205" y1="247" x2="110" y2="302" class="arrow-bold"/>
+  <line x1="205" y1="247" x2="300" y2="302" class="arrow-bold"/>
+
+  <!-- ═══════════ ROLES ═══════════ -->
+  <text x="30" y="400" class="section-label">Roles (reusable units)</text>
+
+  <rect x="30" y="412" width="115" height="45" rx="6" fill="#2E7D32"/>
+  <text x="87" y="432" text-anchor="middle" class="box-label">common/</text>
+  <text x="87" y="449" text-anchor="middle" class="box-sub">All nodes</text>
+
+  <rect x="155" y="412" width="115" height="45" rx="6" fill="#2E7D32"/>
+  <text x="212" y="432" text-anchor="middle" class="box-label">master/</text>
+  <text x="212" y="449" text-anchor="middle" class="box-sub">Control plane</text>
+
+  <rect x="280" y="412" width="115" height="45" rx="6" fill="#2E7D32"/>
+  <text x="337" y="432" text-anchor="middle" class="box-label">worker/</text>
+  <text x="337" y="449" text-anchor="middle" class="box-sub">Join cluster</text>
+
+  <rect x="405" y="412" width="115" height="45" rx="6" fill="#2E7D32"/>
+  <text x="462" y="432" text-anchor="middle" class="box-label">ingress/</text>
+  <text x="462" y="449" text-anchor="middle" class="box-sub">NGINX + Helm</text>
+
+  <!-- Role structure -->
+  <rect x="555" y="407" width="205" height="100" rx="6" fill="#f5f5f5" stroke="#ddd" stroke-width="1"/>
+  <text x="570" y="424" class="note-bold">Role folder structure:</text>
+  <text x="570" y="440" class="note">roles/name/</text>
+  <text x="580" y="454" class="note">├── tasks/main.yml</text>
+  <text x="580" y="468" class="note">├── templates/</text>
+  <text x="580" y="482" class="note">├── handlers/main.yml</text>
+  <text x="580" y="496" class="note">└── defaults/main.yml</text>
+  <line x1="520" y1="435" x2="555" y2="460" class="connector"/>
+
+  <!-- Arrows from plays to roles -->
+  <line x1="110" y1="357" x2="87" y2="412" class="arrow-bold"/>
+  <line x1="110" y1="357" x2="212" y2="412" class="arrow-bold"/>
+  <line x1="300" y1="357" x2="337" y2="412" class="arrow-bold"/>
+  <line x1="300" y1="357" x2="462" y2="412" class="arrow-bold"/>
+
+  <!-- ═══════════ TASKS ═══════════ -->
+  <text x="30" y="505" class="section-label">Tasks (individual actions)</text>
+
+  <rect x="30" y="517" width="200" height="50" rx="6" fill="#FB8C00"/>
+  <text x="130" y="537" text-anchor="middle" class="box-label">Task</text>
+  <text x="130" y="553" text-anchor="middle" class="box-sub">name: + module: + parameters</text>
+
+  <rect x="250" y="517" width="200" height="50" rx="6" fill="#FB8C00"/>
+  <text x="350" y="537" text-anchor="middle" class="box-label">Task</text>
+  <text x="350" y="553" text-anchor="middle" class="box-sub">when: conditional execution</text>
+
+  <!-- Task note -->
+  <rect x="490" y="517" width="270" height="55" rx="6" fill="#f5f5f5" stroke="#ddd" stroke-width="1"/>
+  <text x="505" y="534" class="note-bold">Task controls:</text>
+  <text x="505" y="549" class="note">• when: — run only if condition is true</text>
+  <text x="505" y="562" class="note">• register: — save output to a variable</text>
+  <line x1="450" y1="542" x2="490" y2="542" class="connector"/>
+
+  <!-- Arrows from roles to tasks -->
+  <line x1="150" y1="457" x2="130" y2="517" class="arrow-bold"/>
+  <line x1="280" y1="457" x2="350" y2="517" class="arrow-bold"/>
+
+  <!-- ═══════════ MODULES ═══════════ -->
+  <text x="30" y="610" class="section-label">Modules (built-in actions)</text>
+
+  <rect x="30" y="622" width="95" height="40" rx="6" fill="#7B1FA2"/>
+  <text x="77" y="646" text-anchor="middle" class="box-label">apt</text>
+
+  <rect x="135" y="622" width="95" height="40" rx="6" fill="#7B1FA2"/>
+  <text x="182" y="646" text-anchor="middle" class="box-label">copy</text>
+
+  <rect x="240" y="622" width="95" height="40" rx="6" fill="#7B1FA2"/>
+  <text x="287" y="646" text-anchor="middle" class="box-label">template</text>
+
+  <rect x="345" y="622" width="95" height="40" rx="6" fill="#7B1FA2"/>
+  <text x="392" y="646" text-anchor="middle" class="box-label">command</text>
+
+  <rect x="450" y="622" width="95" height="40" rx="6" fill="#7B1FA2"/>
+  <text x="497" y="646" text-anchor="middle" class="box-label">file</text>
+
+  <rect x="555" y="622" width="95" height="40" rx="6" fill="#7B1FA2"/>
+  <text x="602" y="646" text-anchor="middle" class="box-label">service</text>
+
+  <!-- Module note -->
+  <rect x="665" y="622" width="95" height="40" rx="6" fill="#f5f5f5" stroke="#ddd" stroke-width="1"/>
+  <text x="712" y="640" text-anchor="middle" class="note-bold">+ 3000</text>
+  <text x="712" y="653" text-anchor="middle" class="note">more...</text>
+
+  <!-- Arrows from tasks to modules -->
+  <line x1="130" y1="567" x2="77" y2="622" class="arrow"/>
+  <line x1="130" y1="567" x2="182" y2="622" class="arrow"/>
+  <line x1="350" y1="567" x2="287" y2="622" class="arrow"/>
+  <line x1="350" y1="567" x2="392" y2="622" class="arrow"/>
+
+  <!-- ═══════════ SUPPORTING COMPONENTS ═══════════ -->
+  <text x="30" y="705" class="section-label">Supporting components</text>
+
+  <!-- Handlers -->
+  <rect x="30" y="717" width="140" height="55" rx="6" fill="#00838F"/>
+  <text x="100" y="737" text-anchor="middle" class="box-label">Handlers</text>
+  <text x="100" y="752" text-anchor="middle" class="box-sub">Triggered by notify:</text>
+  <text x="100" y="764" text-anchor="middle" class="box-sub">e.g. restart service</text>
+
+  <!-- Templates -->
+  <rect x="185" y="717" width="140" height="55" rx="6" fill="#00838F"/>
+  <text x="255" y="737" text-anchor="middle" class="box-label">Templates</text>
+  <text x="255" y="752" text-anchor="middle" class="box-sub">Jinja2 (.j2 files)</text>
+  <text x="255" y="764" text-anchor="middle" class="box-sub">{{ variable }} syntax</text>
+
+  <!-- Variables -->
+  <rect x="340" y="717" width="140" height="55" rx="6" fill="#00838F"/>
+  <text x="410" y="737" text-anchor="middle" class="box-label">Variables</text>
+  <text x="410" y="752" text-anchor="middle" class="box-sub">group_vars/ host_vars/</text>
+  <text x="410" y="764" text-anchor="middle" class="box-sub">defaults/ -e CLI</text>
+
+  <!-- Facts -->
+  <rect x="495" y="717" width="140" height="55" rx="6" fill="#00838F"/>
+  <text x="565" y="737" text-anchor="middle" class="box-label">Facts</text>
+  <text x="565" y="752" text-anchor="middle" class="box-sub">Auto-gathered host info</text>
+  <text x="565" y="764" text-anchor="middle" class="box-sub">IP, OS, CPU, memory</text>
+
+  <!-- Plugins -->
+  <rect x="650" y="717" width="110" height="55" rx="6" fill="#00838F"/>
+  <text x="705" y="737" text-anchor="middle" class="box-label">Plugins</text>
+  <text x="705" y="752" text-anchor="middle" class="box-sub">connection</text>
+  <text x="705" y="764" text-anchor="middle" class="box-sub">callback, lookup</text>
+
+  <!-- ═══════════ REMOTE HOSTS ═══════════ -->
+  <text x="30" y="815" class="section-label">Remote Hosts (target machines)</text>
+
+  <rect x="30" y="827" width="155" height="45" rx="6" fill="#232F3E" stroke="#FF9900" stroke-width="2"/>
+  <text x="107" y="847" text-anchor="middle" class="box-label">Master Node</text>
+  <text x="107" y="864" text-anchor="middle" class="box-sub">10.0.11.x (private)</text>
+
+  <rect x="200" y="827" width="155" height="45" rx="6" fill="#232F3E" stroke="#FF9900" stroke-width="2"/>
+  <text x="277" y="847" text-anchor="middle" class="box-label">Worker Node 1</text>
+  <text x="277" y="864" text-anchor="middle" class="box-sub">10.0.12.x (private)</text>
+
+  <rect x="370" y="827" width="155" height="45" rx="6" fill="#232F3E" stroke="#FF9900" stroke-width="2"/>
+  <text x="447" y="847" text-anchor="middle" class="box-label">Worker Node 2</text>
+  <text x="447" y="864" text-anchor="middle" class="box-sub">10.0.11.x (private)</text>
+
+  <!-- SSH arrow -->
+  <rect x="570" y="827" width="190" height="45" rx="6" fill="#f5f5f5" stroke="#ddd" stroke-width="1"/>
+  <text x="665" y="844" text-anchor="middle" class="note-bold">Connection: SSH</text>
+  <text x="665" y="859" text-anchor="middle" class="note">via bastion (ProxyCommand)</text>
+
+  <!-- Arrows from modules/handlers to remote hosts -->
+  <line x1="200" y1="772" x2="107" y2="827" class="arrow-bold"/>
+  <line x1="300" y1="772" x2="277" y2="827" class="arrow-bold"/>
+  <line x1="400" y1="772" x2="447" y2="827" class="arrow-bold"/>
+
+  <!-- ═══════════ LEGEND ═══════════ -->
+  <rect x="30" y="888" width="730" height="25" rx="4" fill="#f5f5f5" stroke="#ddd" stroke-width="1"/>
+  <rect x="40" y="894" width="12" height="12" rx="2" fill="#E65100"/>
+  <text x="58" y="904" class="legend-text">Inventory</text>
+  <rect x="115" y="894" width="12" height="12" rx="2" fill="#326CE5"/>
+  <text x="133" y="904" class="legend-text">Playbook/Play</text>
+  <rect x="215" y="894" width="12" height="12" rx="2" fill="#2E7D32"/>
+  <text x="233" y="904" class="legend-text">Role</text>
+  <rect x="275" y="894" width="12" height="12" rx="2" fill="#FB8C00"/>
+  <text x="293" y="904" class="legend-text">Task</text>
+  <rect x="330" y="894" width="12" height="12" rx="2" fill="#7B1FA2"/>
+  <text x="348" y="904" class="legend-text">Module</text>
+  <rect x="405" y="894" width="12" height="12" rx="2" fill="#00838F"/>
+  <text x="423" y="904" class="legend-text">Supporting</text>
+  <rect x="490" y="894" width="12" height="12" rx="2" fill="#232F3E" stroke="#FF9900" stroke-width="1"/>
+  <text x="508" y="904" class="legend-text">Remote Host</text>
+  <line x1="590" y1="900" x2="620" y2="900" class="arrow-bold"/>
+  <text x="628" y="904" class="legend-text">Execution flow</text>
+</svg>

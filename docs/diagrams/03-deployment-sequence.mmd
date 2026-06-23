@@ -1,0 +1,92 @@
+%%{init: {"theme": "base", "themeVariables": {"actorBkg": "#232F3E", "actorTextColor": "#ffffff", "actorBorderColor": "#FF9900", "activationBkgColor": "#1565C0", "activationBorderColor": "#326CE5", "signalColor": "#37474F", "signalTextColor": "#37474F", "labelBoxBkgColor": "#FFF8E1", "noteBkgColor": "#FFF8E1", "noteTextColor": "#333"}}}%%
+
+sequenceDiagram
+    autonumber
+
+    actor Operator
+    participant TF   as Terraform
+    participant AWS  as AWS APIs
+    participant INV  as hosts.ini
+    participant ANS  as Ansible
+    participant COM  as All Nodes<br/>(common role)
+    participant MST  as Master Node<br/>(master role)
+    participant WRK  as Worker Nodes<br/>(worker role)
+
+    rect rgb(255, 243, 224)
+        Note over Operator,AWS: Phase 1 — Infrastructure provisioning (terraform apply)
+        Operator  ->> TF  : terraform init
+        TF        ->> AWS : lookup Ubuntu 22.04 AMI
+        AWS       -->> TF : ami-xxxxxxxxx
+
+        Operator  ->> TF  : terraform apply
+
+        TF        ->> AWS : create VPC, subnets, IGW, single NAT Gateway
+        TF        ->> AWS : create Security Groups (bastion / master / worker)
+        TF        ->> AWS : generate tls_private_key → aws_key_pair
+        TF        ->> AWS : create Bastion EC2 instance (public subnet)
+        TF        ->> AWS : create Master EC2 instance(s) (private subnet)
+        TF        ->> AWS : create Launch Template + Auto Scaling Group (workers)
+        AWS       -->> TF : all resources ready
+
+        TF        ->> INV : write ansible/inventory/hosts.ini<br/>(bastion IP, master IPs, worker IPs)
+        TF        ->> Operator : write terraform/k8s-cluster.pem (chmod 600)
+        TF        -->> Operator : outputs: bastion_public_ip, master_private_ips
+    end
+
+    rect rgb(227, 242, 253)
+        Note over Operator,COM: Phase 2 — Common prerequisites (runs on ALL nodes in parallel)
+        Operator  ->> ANS : ansible-playbook site.yml
+        ANS       ->> COM : disable swap + remove from /etc/fstab
+        ANS       ->> COM : load kernel modules: overlay, br_netfilter
+        ANS       ->> COM : apply sysctl (ip_forward, bridge-nf-call-iptables)
+        ANS       ->> COM : install containerd + deploy config (SystemdCgroup=true)
+        ANS       ->> COM : add Kubernetes apt repo (v1.29)
+        ANS       ->> COM : install kubeadm, kubelet, kubectl → hold versions
+        ANS       ->> COM : enable kubelet.service
+        COM       -->> ANS : common role complete
+    end
+
+    rect rgb(232, 245, 233)
+        Note over ANS,MST: Phase 3 — Control plane bootstrap (master[0] only)
+        ANS       ->> MST : render kubeadm-config.yml (master IP as controlPlaneEndpoint)
+        ANS       ->> MST : kubeadm init --config --upload-certs
+        MST       ->> MST : starts etcd, kube-apiserver, controller-manager, scheduler, kube-proxy
+        MST       -->> ANS : cluster initialised
+        ANS       ->> MST : copy admin.conf → /home/ubuntu/.kube/config
+        ANS       ->> Operator : fetch kubeconfig → ./kubeconfig
+        ANS       ->> MST : kubectl apply -f calico.yaml (CNI)
+        MST       ->> MST : calico-node DaemonSet running
+        ANS       ->> MST : kubeadm token create --print-join-command
+        MST       -->> ANS : join command string
+        ANS       ->> Operator : save join command → /tmp/worker_join_command.sh
+    end
+
+    rect rgb(243, 229, 245)
+        Note over ANS,WRK: Phase 4 — Worker nodes join (serial: 1 to avoid race on token)
+        loop for each worker node
+            ANS   ->> WRK : copy worker_join_command.sh
+            ANS   ->> WRK : bash worker_join_command.sh<br/>(kubeadm join master-ip:6443 --token ...)
+            WRK   ->> MST : TLS bootstrap handshake :6443
+            MST   -->> WRK : signed kubelet certificate
+            WRK   -->> MST : node registers (NotReady)
+            MST   ->> WRK : Calico assigns pod CIDR
+            WRK   -->> MST : node Ready
+            ANS   ->> WRK : remove join command script
+        end
+        ANS       -->> Operator : playbook complete
+    end
+
+    rect rgb(224, 247, 250)
+        Note over ANS,MST: Phase 5 — NGINX Ingress Controller (master[0])
+        ANS       ->> MST : install Helm (if not present)
+        ANS       ->> MST : helm repo add ingress-nginx
+        ANS       ->> MST : helm install ingress-nginx (NodePort 30080/30443)
+        MST       ->> MST : ingress-nginx-controller Deployment running on workers
+        ANS       -->> Operator : ingress ready
+    end
+
+    rect rgb(255, 253, 231)
+        Note over Operator,MST: Phase 6 — Verify
+        Operator  ->> MST : kubectl get nodes (via SSH through bastion)
+        MST       -->> Operator : NAME     STATUS   ROLES    AGE<br/>master-1   Ready    control-plane  ...<br/>worker-1   Ready    worker         ...<br/>worker-2   Ready    worker         ...
+    end

@@ -1,0 +1,55 @@
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#1565C0", "primaryTextColor": "#ffffff", "lineColor": "#546E7A"}}}%%
+
+flowchart LR
+    %% ── Actors ───────────────────────────────────────────────────────────────
+    Dev(["👤 Developer\n/ Operator"])
+    ExtSvc(["🌐 External\nService"])
+
+    %% ── Security Groups ──────────────────────────────────────────────────────
+    subgraph SGBastion["SG: bastion-sg"]
+        Bastion["Bastion\n0.0.0.0/0 → :22"]
+    end
+
+    subgraph SGMaster["SG: master-sg"]
+        direction TB
+        Master["Master Node"]
+        MasterPorts["Allowed inbound:\n:22   from bastion-sg\n:6443 from VPC CIDR\n:2379-2380 from VPC\n:10250-10252 from VPC\n:179 BGP from VPC\n:4789 VXLAN from VPC"]
+    end
+
+    subgraph SGWorker["SG: worker-sg"]
+        direction TB
+        Worker["Worker Nodes\n(ASG)"]
+        WorkerPorts["Allowed inbound:\n:22   from bastion-sg\n:10250 from VPC\n:30000-32767 NodePort from VPC\n:179 BGP from VPC\n:4789 VXLAN from VPC"]
+    end
+
+    %% ── Traffic flows ────────────────────────────────────────────────────────
+    Dev -- "① SSH :22\n(to bastion only)" --> Bastion
+    Bastion -- "② SSH ProxyCommand\n:22" --> Master
+    Bastion -- "② SSH ProxyCommand\n:22" --> Worker
+
+    Dev -- "③ kubectl via\nSSH tunnel :6443" --> Bastion
+
+    Dev -- "④ HTTP/HTTPS via\nSSH tunnel or forward" --> Bastion
+    Bastion -- "④ Ingress\n:30080/:30443" --> Worker
+
+    ExtSvc -- "⑤ NodePort\n:30000-32767" --> Worker
+
+    Master <-- "⑥ etcd replication\n:2379-2380" --> Master
+    Master <-- "⑦ Pod network\nCalico BGP :179\nVXLAN UDP :4789" --> Worker
+    Master -- "⑧ kubelet API\n:10250" --> Worker
+
+    %% ── Egress ───────────────────────────────────────────────────────────────
+    Master -. "egress via NAT\nimage pulls / updates" .-> Internet2(["🌐 Internet"])
+    Worker -. "egress via NAT\nimage pulls / updates" .-> Internet2
+
+    %% ── Styles ───────────────────────────────────────────────────────────────
+    classDef actor      fill:#FFF8E1,stroke:#F9A825,color:#333,font-weight:bold
+    classDef node       fill:#1565C0,stroke:#0D47A1,color:#ffffff,font-weight:bold
+    classDef ports      fill:#ECEFF1,stroke:#90A4AE,color:#37474F,font-size:11px
+    classDef internet   fill:#E8EAF6,stroke:#7986CB,color:#283593
+
+    class Dev,ExtSvc actor
+    class Master,Worker node
+    class MasterPorts,WorkerPorts ports
+    class Bastion node
+    class Internet2 internet

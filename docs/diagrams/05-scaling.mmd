@@ -1,0 +1,63 @@
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#2E7D32", "primaryTextColor": "#ffffff", "lineColor": "#546E7A"}}}%%
+
+flowchart TD
+    subgraph Scale["Scaling workflow"]
+        direction TB
+
+        Var["Edit terraform.tfvars\nworker_count = N"]
+        Apply["terraform apply"]
+
+        subgraph ASG["Auto Scaling Group"]
+            direction LR
+            W1["Worker 1\n✅ existing"]
+            W2["Worker 2\n✅ existing"]
+            W3["Worker 3\n🆕 new"]
+            WN["Worker N\n🆕 new"]
+        end
+
+        Wait["Wait for EC2\ninstance running\n+ Python ready"]
+        Ansible["ansible-playbook site.yml\n(idempotent — existing nodes skipped)"]
+
+        subgraph Join["kubeadm join (new nodes only)"]
+            JC["Copy join command\nfrom controller"]
+            KJ["kubeadm join\nmaster-ip:6443 --token ..."]
+            NR["Node registers\nwith API server"]
+            CA["Calico assigns\npod CIDR slice"]
+            NRY["Node status: Ready"]
+        end
+
+        Verify["kubectl get nodes\n(all nodes Ready)"]
+    end
+
+    Var --> Apply
+    Apply --> ASG
+    ASG --> Wait
+    Wait --> Ansible
+    Ansible --> Join
+    JC --> KJ --> NR --> CA --> NRY
+    NRY --> Verify
+
+    note1["worker_min_count ≤ worker_count ≤ worker_max_count\nASG enforces bounds automatically"]
+
+    subgraph ScaleDown["Scale down"]
+        direction LR
+        Drain["kubectl drain worker-N\n--ignore-daemonsets\n--delete-emptydir-data"]
+        Delete["kubectl delete node worker-N"]
+        TFDown["terraform apply\nworker_count = N-1"]
+        ASGTerm["ASG terminates\nEC2 instance"]
+    end
+
+    Drain --> Delete --> TFDown --> ASGTerm
+
+    classDef action fill:#1565C0,stroke:#0D47A1,color:#ffffff,font-weight:bold
+    classDef new    fill:#2E7D32,stroke:#1B5E20,color:#ffffff
+    classDef exist  fill:#37474F,stroke:#78909C,color:#ffffff
+    classDef verify fill:#FF9900,stroke:#E65100,color:#232F3E,font-weight:bold
+    classDef note   fill:#FFF8E1,stroke:#F9A825,color:#333,font-style:italic
+
+    class Apply,Ansible,JC,KJ action
+    class W3,WN new
+    class W1,W2 exist
+    class Verify,NRY verify
+    class note1 note
+    class Drain,Delete,TFDown,ASGTerm action

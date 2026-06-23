@@ -1,0 +1,38 @@
+# ── Secrets & credentials ─────────────────────────────────────────────────────
+.env
+*.pem
+*.key
+
+# ── Terraform ─────────────────────────────────────────────────────────────────
+**/.terraform/
+**/.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.tfvars
+!*.tfvars.example
+*.tfplan
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+crash.log
+
+# ── Ansible ───────────────────────────────────────────────────────────────────
+ansible/inventory/hosts.ini
+*.retry
+/tmp/worker_join_command.sh
+
+# ── Kubeconfig ────────────────────────────────────────────────────────────────
+kubeconfig
+
+# ── Claude Code ───────────────────────────────────────────────────────────────
+.claude/
+CLAUDE.md
+
+# ── OS / Editor ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo

@@ -1,0 +1,115 @@
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#326CE5", "primaryTextColor": "#ffffff", "primaryBorderColor": "#1a4a9e", "lineColor": "#546E7A", "clusterBkg": "#E3F2FD"}}}%%
+
+graph TB
+    subgraph ControlPlane["🖥  Master Node  (t3.medium · private subnet)"]
+        direction TB
+
+        subgraph KubeSystem["kube-system control-plane pods (static)"]
+            direction LR
+            APIServer["kube-apiserver\n:6443"]
+            ETCD["etcd\n:2379-2380"]
+            CM["kube-controller\n-manager\n:10252"]
+            Sched["kube-scheduler\n:10251"]
+        end
+
+        subgraph NodeAgents_M["Node agents"]
+            direction LR
+            Kubelet_M["kubelet\n:10250"]
+            KubeProxy_M["kube-proxy\n(iptables/IPVS)"]
+            Containerd_M["containerd\n(CRI)"]
+        end
+
+        subgraph CNI_M["CNI — Calico"]
+            direction LR
+            CalicoNode_M["calico-node\n(DaemonSet)"]
+            CalicoCtrl["calico-kube\n-controllers"]
+        end
+
+        APIServer <--> ETCD
+        APIServer --> CM
+        APIServer --> Sched
+        Kubelet_M --> APIServer
+        Kubelet_M --> Containerd_M
+        CalicoNode_M --> APIServer
+    end
+
+    subgraph WorkerPlane["⚙  Worker Node × N  (t3.medium · ASG · private subnet)"]
+        direction TB
+
+        subgraph NodeAgents_W["Node agents"]
+            direction LR
+            Kubelet_W["kubelet\n:10250"]
+            KubeProxy_W["kube-proxy\n(iptables/IPVS)"]
+            Containerd_W["containerd\n(CRI)"]
+        end
+
+        subgraph CNI_W["CNI — Calico"]
+            CalicoNode_W["calico-node\n(DaemonSet)"]
+        end
+
+        subgraph IngressNS["ingress-nginx namespace"]
+            IngressCtrl["ingress-nginx\n-controller\n(Deployment)\n:30080 / :30443"]
+        end
+
+        subgraph Workloads["User workloads"]
+            direction LR
+            PodA["Pod A\n(container)"]
+            PodB["Pod B\n(container)"]
+        end
+
+        IngressCtrl --> PodA
+        IngressCtrl --> PodB
+
+        Kubelet_W --> Containerd_W
+        Containerd_W --> PodA
+        Containerd_W --> PodB
+        KubeProxy_W --> PodA
+        KubeProxy_W --> PodB
+        CalicoNode_W --> PodA
+        CalicoNode_W --> PodB
+    end
+
+    subgraph External["External access"]
+        Bastion["🔑 Bastion\n(SSH tunnel / forward)"]
+        Kubectl(["kubectl / client"])
+        Browser(["🌐 Browser"])
+    end
+
+    subgraph PodNetwork["Pod Network — Calico (192.168.0.0/16)"]
+        VXLAN["VXLAN overlay\nBGP route distribution"]
+    end
+
+    Kubectl --> Bastion
+    Bastion --> APIServer
+    Browser --> Bastion
+    Bastion -- ":30080/:30443" --> IngressCtrl
+
+    Kubelet_W -- "watches / reports" --> APIServer
+    KubeProxy_W -- "watches Services" --> APIServer
+    CM -- "manages\nReplicaSets etc." --> APIServer
+
+    CalicoNode_M <-- "BGP peering\nVXLAN :4789" --> CalicoNode_W
+
+    PodA <-. "pod-to-pod\n192.168.x.x" .-> PodB
+    PodA <-. "cross-node\npod traffic" .-> CalicoNode_W
+
+    VXLAN -. "encapsulates\ninter-node traffic" .-> CalicoNode_M
+    VXLAN -. "encapsulates\ninter-node traffic" .-> CalicoNode_W
+
+    %% ── Styles ───────────────────────────────────────────────────────────────
+    classDef k8sCore   fill:#326CE5,stroke:#1a4a9e,color:#ffffff,font-weight:bold
+    classDef agent     fill:#37474F,stroke:#78909C,color:#ffffff
+    classDef calico    fill:#FB8C00,stroke:#E65100,color:#ffffff
+    classDef workload  fill:#43A047,stroke:#1B5E20,color:#ffffff
+    classDef external  fill:#FF9900,stroke:#232F3E,color:#232F3E,font-weight:bold
+    classDef overlay   fill:#EDE7F6,stroke:#7E57C2,color:#4A148C
+
+    class APIServer,ETCD,CM,Sched k8sCore
+    class Kubelet_M,Kubelet_W,KubeProxy_M,KubeProxy_W,Containerd_M,Containerd_W agent
+    class CalicoNode_M,CalicoNode_W,CalicoCtrl calico
+    class PodA,PodB workload
+    classDef ingress  fill:#7B1FA2,stroke:#4A148C,color:#ffffff,font-weight:bold
+
+    class Bastion,Kubectl,Browser external
+    class VXLAN overlay
+    class IngressCtrl ingress

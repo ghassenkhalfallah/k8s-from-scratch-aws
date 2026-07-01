@@ -1,0 +1,29 @@
+---
+- name: Apply common Kubernetes prerequisites to all nodes
+  hosts: k8s_cluster
+  become: true
+  gather_facts: true
+  roles:
+    - common
+
+- name: Initialise the first master node
+  hosts: masters[0]
+  become: true
+  gather_facts: true
+  roles:
+    - master
+
+- name: Join worker nodes to the cluster
+  hosts: workers
+  become: true
+  gather_facts: true
+  serial: 1
+  roles:
+    - worker
+
+- name: Deploy NGINX Ingress Controller
+  hosts: masters[0]
+  become: true
+  gather_facts: false
+  roles:
+    - ingress

@@ -1,0 +1,124 @@
+---
+- name: Check if cluster is already initialised
+  stat:
+    path: /etc/kubernetes/admin.conf
+  register: kubeconfig_stat
+
+- name: Render kubeadm config
+  template:
+    src: kubeadm-config.yml.j2
+    dest: "{{ kubeadm_config_path }}"
+    mode: "0600"
+  when: not kubeconfig_stat.stat.exists
+
+- name: Initialise the cluster with kubeadm
+  command: >
+    kubeadm init
+    --config {{ kubeadm_config_path }}
+    --upload-certs
+  when: not kubeconfig_stat.stat.exists
+  register: kubeadm_init
+  notify: Restart kubelet
+
+- name: Create .kube directory for ubuntu user
+  file:
+    path: /home/ubuntu/.kube
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: "0700"
+
+- name: Copy admin.conf to ubuntu user's .kube/config
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /home/ubuntu/.kube/config
+    remote_src: true
+    owner: ubuntu
+    group: ubuntu
+    mode: "0600"
+
+- name: Fetch kubeconfig to the Ansible controller
+  fetch:
+    src: /etc/kubernetes/admin.conf
+    dest: "{{ local_kubeconfig }}"
+    flat: true
+  become: true
+
+- name: Wait for kube-apiserver to become ready
+  wait_for:
+    host: "{{ ansible_default_ipv4.address }}"
+    port: 6443
+    delay: 10
+    timeout: 120
+
+- name: Check if Calico is already installed
+  command: kubectl get daemonset calico-node -n kube-system
+  become: false
+  become_user: ubuntu
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: calico_check
+  failed_when: false
+  changed_when: false
+
+- name: Apply Calico CNI manifest
+  command: kubectl apply -f {{ calico_manifest_url }}
+  become: false
+  become_user: ubuntu
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  when: calico_check.rc != 0
+  retries: 3
+  delay: 15
+
+- name: Switch Calico from IPIP to VXLAN encapsulation
+  command: >
+    kubectl patch ippool default-ipv4-ippool --type merge
+    -p '{"spec":{"ipipMode":"Never","vxlanMode":"Always"}}'
+  become: false
+  become_user: ubuntu
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  when: calico_check.rc != 0
+  retries: 3
+  delay: 10
+
+- name: Restart calico-node after encapsulation change
+  command: kubectl rollout restart daemonset/calico-node -n kube-system
+  become: false
+  become_user: ubuntu
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  when: calico_check.rc != 0
+
+- name: Wait for Calico pods to be running
+  command: >
+    kubectl wait --for=condition=ready pod
+    -l k8s-app=calico-node
+    -n kube-system
+    --timeout=180s
+  become: false
+  become_user: ubuntu
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  retries: 5
+  delay: 20
+  register: calico_ready
+  until: calico_ready.rc == 0
+
+- name: Generate worker join command
+  command: kubeadm token create --print-join-command
+  register: join_command_raw
+  changed_when: false
+
+- name: Store join command in a file accessible to workers
+  copy:
+    content: "{{ join_command_raw.stdout_lines | last }}"
+    dest: /tmp/worker_join_command.sh
+    mode: "0600"
+
+- name: Fetch join command to Ansible controller
+  fetch:
+    src: /tmp/worker_join_command.sh
+    dest: /tmp/worker_join_command.sh
+    flat: true

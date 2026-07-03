@@ -1,0 +1,33 @@
+---
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: ClusterConfiguration
+kubernetesVersion: v{{ kubernetes_version }}.0
+clusterName: {{ cluster_name | default('kubernetes') }}
+controlPlaneEndpoint: "{{ ansible_default_ipv4.address }}:6443"
+networking:
+  podSubnet: "{{ pod_cidr }}"
+  serviceSubnet: "{{ service_cidr }}"
+  dnsDomain: "{{ service_dns_domain }}"
+apiServer:
+  certSANs:
+    - "{{ ansible_default_ipv4.address }}"
+    - "127.0.0.1"
+    - "localhost"
+  extraArgs:
+    authorization-mode: "Node,RBAC"
+    enable-admission-plugins: "NodeRestriction"
+etcd:
+  local:
+    dataDir: /var/lib/etcd
+---
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: "{{ ansible_default_ipv4.address }}"
+  bindPort: 6443
+nodeRegistration:
+  criSocket: unix:///run/containerd/containerd.sock
+---
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+cgroupDriver: systemd

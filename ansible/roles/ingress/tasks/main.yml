@@ -1,0 +1,61 @@
+---
+- name: Check if Helm is installed
+  command: helm version --short
+  register: helm_check
+  failed_when: false
+  changed_when: false
+
+- name: Install Helm
+  shell: curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+  when: helm_check.rc != 0
+
+- name: Add ingress-nginx Helm repository
+  command: helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+  become: false
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: repo_add
+  changed_when: "'has been added' in repo_add.stdout"
+  failed_when: "repo_add.rc != 0 and 'already exists' not in repo_add.stderr"
+
+- name: Update Helm repositories
+  command: helm repo update
+  become: false
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  changed_when: false
+
+- name: Check if ingress-nginx is already installed
+  command: helm status ingress-nginx -n ingress-nginx
+  become: false
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: ingress_check
+  failed_when: false
+  changed_when: false
+
+- name: Install ingress-nginx via Helm
+  command: >
+    helm install ingress-nginx ingress-nginx/ingress-nginx
+    --namespace ingress-nginx --create-namespace
+    --version {{ ingress_nginx_version }}
+    --set controller.service.type=NodePort
+    --set controller.service.nodePorts.http={{ ingress_http_nodeport }}
+    --set controller.service.nodePorts.https={{ ingress_https_nodeport }}
+  become: false
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  when: ingress_check.rc != 0
+
+- name: Wait for ingress-nginx controller to be ready
+  command: >
+    kubectl wait --for=condition=available deployment/ingress-nginx-controller
+    -n ingress-nginx
+    --timeout=180s
+  become: false
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  retries: 3
+  delay: 15
+  register: ingress_ready
+  until: ingress_ready.rc == 0

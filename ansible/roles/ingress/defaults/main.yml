@@ -1,0 +1,4 @@
+---
+ingress_nginx_version: "4.12.0"
+ingress_http_nodeport: 30080
+ingress_https_nodeport: 30443

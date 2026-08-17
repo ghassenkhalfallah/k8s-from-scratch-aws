@@ -1,0 +1,29 @@
+---
+- name: Check if node is already part of a cluster
+  stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: kubelet_conf_stat
+
+- name: Copy join command from Ansible controller to worker
+  copy:
+    src: /tmp/worker_join_command.sh
+    dest: /tmp/worker_join_command.sh
+    mode: "0700"
+  when: not kubelet_conf_stat.stat.exists
+
+- name: Execute kubeadm join
+  command: bash /tmp/worker_join_command.sh
+  when: not kubelet_conf_stat.stat.exists
+  register: kubeadm_join
+  notify: Restart kubelet
+
+- name: Remove join command script from worker
+  file:
+    path: /tmp/worker_join_command.sh
+    state: absent
+
+- name: Wait for kubelet to be active
+  systemd:
+    name: kubelet
+    state: started
+    enabled: true

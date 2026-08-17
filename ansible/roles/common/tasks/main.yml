@@ -1,0 +1,131 @@
+---
+- name: Update apt cache
+  apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install prerequisite packages
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+      - software-properties-common
+      - python3-pip
+      - nfs-common
+    state: present
+
+- name: Disable swap immediately
+  command: swapoff -a
+  changed_when: false
+
+- name: Remove swap entry from /etc/fstab
+  replace:
+    path: /etc/fstab
+    regexp: '^([^#].*\s+swap\s+.*)$'
+    replace: '# \1'
+
+- name: Load required kernel modules
+  modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - overlay
+    - br_netfilter
+
+- name: Persist kernel modules across reboots
+  copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      overlay
+      br_netfilter
+    mode: "0644"
+
+- name: Set required sysctl parameters
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: true
+    sysctl_file: /etc/sysctl.d/99-kubernetes.conf
+  loop:
+    - { name: "net.bridge.bridge-nf-call-iptables",  value: "1" }
+    - { name: "net.bridge.bridge-nf-call-ip6tables", value: "1" }
+    - { name: "net.ipv4.ip_forward",                 value: "1" }
+
+- name: Install containerd
+  apt:
+    name: "containerd={{ containerd_version }}"
+    state: present
+    update_cache: true
+  notify: Restart containerd
+
+- name: Ensure containerd config directory exists
+  file:
+    path: "{{ containerd_config_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Deploy containerd configuration
+  copy:
+    src: containerd-config.toml
+    dest: "{{ containerd_config_dir }}/config.toml"
+    mode: "0644"
+  notify: Restart containerd
+
+- name: Enable and start containerd
+  systemd:
+    name: containerd
+    enabled: true
+    state: started
+
+- name: Ensure /etc/apt/keyrings directory exists
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Add Kubernetes apt signing key
+  get_url:
+    url: "{{ kubernetes_apt_key_url }}"
+    dest: /tmp/kubernetes-release.key
+    mode: "0644"
+
+- name: Dearmour Kubernetes apt key
+  shell: |
+    gpg --dearmor < /tmp/kubernetes-release.key > /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  args:
+    creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+- name: Add Kubernetes apt repository
+  apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] {{ kubernetes_apt_repo }} /"
+    state: present
+    filename: kubernetes
+    update_cache: true
+
+- name: Install kubeadm, kubelet, kubectl
+  apt:
+    name:
+      - "kubelet={{ kubernetes_version }}.*"
+      - "kubeadm={{ kubernetes_version }}.*"
+      - "kubectl={{ kubernetes_version }}.*"
+    state: present
+    update_cache: true
+
+- name: Hold Kubernetes packages at current version
+  dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - kubelet
+    - kubeadm
+    - kubectl
+
+- name: Enable kubelet service
+  systemd:
+    name: kubelet
+    enabled: true
+    state: started

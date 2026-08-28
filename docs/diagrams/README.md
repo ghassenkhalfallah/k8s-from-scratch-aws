@@ -9,6 +9,7 @@
 | [03-deployment-sequence.mmd](03-deployment-sequence.mmd) | Mermaid | Step-by-step sequence: Terraform → Ansible → kubeadm |
 | [04-kubernetes-components.mmd](04-kubernetes-components.mmd) | Mermaid | Kubernetes components per node type (control-plane vs worker) |
 | [05-scaling.mmd](05-scaling.mmd) | Mermaid | Scale-out and scale-in workflows |
+| [08-gitops-flow.mmd](08-gitops-flow.mmd) | Mermaid | GitOps flow: Terraform → Ansible (through the gitops role) → ArgoCD watching the separate `k8s-gitops` repo → sync/reconcile loop → workloads, with the developer push and bastion-tunnel access paths |
 | [architecture.puml](architecture.puml) | PlantUML | Full architecture with security group annotations and IAM notes |
 
 ## How to render

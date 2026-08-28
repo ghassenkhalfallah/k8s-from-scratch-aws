@@ -34,7 +34,7 @@
 
 ## Ansible — bootstraps Kubernetes
 
-**Flow:** `site.yml` → 4 plays → 4 roles
+**Flow:** `site.yml` → 5 plays → 5 roles
 
 ### Play 1 — `common` role (runs on ALL nodes in parallel)
 - Disables swap (k8s requirement)
@@ -61,6 +61,14 @@
 - Configured as NodePort (30080 HTTP, 30443 HTTPS) since there's no cloud LB
 - All services can be exposed through a single entry point using Ingress resources
 
+### Play 5 — `gitops` role (runs on master[0])
+- Installs Helm (if not present)
+- Adds the argo Helm repository
+- Installs ArgoCD in the `argocd` namespace, configured as NodePort (30090 HTTP, 30453 HTTPS)
+- Applies a bootstrap `Application` resource pointing at the separate `k8s-gitops` manifests repo (`apps/` path, automated sync with prune + self-heal)
+- Fetches the initial admin password to the controller (`argocd-admin-password`, gitignored)
+- From here on, app deployments happen by pushing manifests to `k8s-gitops` — ArgoCD reconciles the cluster automatically instead of manual `kubectl`/`helm`
+
 ---
 
 ## The handoff
@@ -75,6 +83,7 @@ Terraform                          Ansible
    │                                  ├─ kubeadm init on master
    │                                  ├─ kubeadm join on workers
    │                                  ├─ install NGINX Ingress (Helm)
+   │                                  ├─ install ArgoCD (Helm) + bootstrap Application
    │                                  └─ cluster ready
 ```
 

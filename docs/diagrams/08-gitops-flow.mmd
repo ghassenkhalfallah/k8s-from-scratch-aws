@@ -1,0 +1,68 @@
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#326CE5", "primaryTextColor": "#ffffff", "primaryBorderColor": "#1a4a9e", "lineColor": "#546E7A", "clusterBkg": "#E3F2FD"}}}%%
+
+flowchart LR
+    subgraph Provision["Terraform — provision (terraform apply)"]
+        direction TB
+        TFVars["variables.tf / terraform.tfvars"]
+        TFApply["main.tf → vpc / security / compute modules"]
+        Inv["writes ansible/inventory/hosts.ini"]
+        TFVars --> TFApply --> Inv
+    end
+
+    subgraph Bootstrap["Ansible — bootstrap (site.yml, 5 plays)"]
+        direction TB
+        Common["Play 1 common\n(all nodes)"]
+        Master["Play 2 master\nkubeadm init + Calico"]
+        Worker["Play 3 worker\nkubeadm join (serial:1)"]
+        Ingress["Play 4 ingress\nNGINX Ingress (Helm)"]
+        Gitops["Play 5 gitops\nInstall ArgoCD (Helm)\n+ apply bootstrap Application"]
+        Common --> Master --> Worker --> Ingress --> Gitops
+    end
+
+    Inv --> Common
+
+    subgraph Cluster["Kubernetes cluster"]
+        direction TB
+        ArgoCD["ArgoCD\n(argocd namespace)\nNodePort 30090/30453"]
+        RootApp["root-app Application CR\nsource: k8s-gitops repo, path apps/\nrecurse: true"]
+        SyncLoop{{"Sync / reconcile loop\nsyncPolicy.automated:\nprune + selfHeal"}}
+        Workloads["Workloads in target namespace\n(e.g. sample-app: Deployment/Service/Ingress)"]
+
+        ArgoCD --> RootApp --> SyncLoop --> Workloads
+        SyncLoop -. "detects drift,\nself-heals" .-> Workloads
+    end
+
+    Gitops -- "installs + bootstraps" --> ArgoCD
+
+    subgraph GitopsRepo["Separate repo: k8s-gitops (GitHub)"]
+        direction TB
+        Dev["Developer edits/adds manifests\nunder apps/"]
+        Push["git push"]
+        Dev --> Push
+    end
+
+    Push -- "polled continuously" --> SyncLoop
+    SyncLoop -- "watches" --> GitopsRepo
+
+    subgraph Access["Access (no load balancer)"]
+        direction TB
+        Bastion["Bastion SSH tunnel\n-L 30453:localhost:30453"]
+        UI["ArgoCD UI/API\nhttps://localhost:30453\nadmin / ./argocd-admin-password"]
+        Bastion --> UI
+    end
+
+    UI -. "operator views\nsync status" .-> ArgoCD
+
+    classDef tf      fill:#7B42BC,stroke:#4A2A73,color:#ffffff,font-weight:bold
+    classDef ansible fill:#1565C0,stroke:#0D47A1,color:#ffffff,font-weight:bold
+    classDef argo    fill:#EF7B4D,stroke:#B34700,color:#ffffff,font-weight:bold
+    classDef repo    fill:#2E7D32,stroke:#1B5E20,color:#ffffff
+    classDef access  fill:#FF9900,stroke:#232F3E,color:#232F3E,font-weight:bold
+    classDef workload fill:#43A047,stroke:#1B5E20,color:#ffffff
+
+    class TFVars,TFApply,Inv tf
+    class Common,Master,Worker,Ingress,Gitops ansible
+    class ArgoCD,RootApp,SyncLoop argo
+    class Dev,Push repo
+    class Bastion,UI access
+    class Workloads workload

@@ -2,8 +2,8 @@
 
 ## Tier 1 — Must-haves (production awareness)
 - [x] Ingress Controller (NGINX Ingress) — cert-manager TLS pending
-- [ ] Monitoring stack (Prometheus + Grafana via Helm)
-- [ ] GitOps (ArgoCD or Flux)
+- [x] Monitoring stack (Prometheus + Grafana via Helm, deployed via GitOps app-of-apps)
+- [x] GitOps (ArgoCD)
 - [ ] Remote Terraform state (S3 + DynamoDB backend)
 
 ## Tier 2 — Differentiators (stands out)

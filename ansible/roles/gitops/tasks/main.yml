@@ -1,0 +1,93 @@
+---
+- name: Check if Helm is installed
+  command: helm version --short
+  register: helm_check
+  failed_when: false
+  changed_when: false
+
+- name: Install Helm
+  shell: curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+  when: helm_check.rc != 0
+
+- name: Add argo Helm repository
+  command: helm repo add argo https://argoproj.github.io/argo-helm
+  become: false
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: repo_add
+  changed_when: "'has been added' in repo_add.stdout"
+  failed_when: "repo_add.rc != 0 and 'already exists' not in repo_add.stderr"
+
+- name: Update Helm repositories
+  command: helm repo update
+  become: false
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  changed_when: false
+
+- name: Check if argocd is already installed
+  command: helm status argocd -n {{ argocd_namespace }}
+  become: false
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: argocd_check
+  failed_when: false
+  changed_when: false
+
+- name: Install ArgoCD via Helm
+  command: >
+    helm install argocd argo/argo-cd
+    --namespace {{ argocd_namespace }} --create-namespace
+    --version {{ argocd_version }}
+    --set server.service.type=NodePort
+    --set server.service.nodePortHttp={{ argocd_http_nodeport }}
+    --set server.service.nodePortHttps={{ argocd_https_nodeport }}
+  become: false
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  when: argocd_check.rc != 0
+
+- name: Wait for argocd-server to be ready
+  command: >
+    kubectl wait --for=condition=available deployment/argocd-server
+    -n {{ argocd_namespace }}
+    --timeout=180s
+  become: false
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  retries: 3
+  delay: 15
+  register: argocd_ready
+  until: argocd_ready.rc == 0
+
+- name: Render ArgoCD root Application manifest
+  template:
+    src: argocd-root-app.yml.j2
+    dest: /tmp/argocd-root-app.yml
+    mode: "0644"
+
+- name: Apply ArgoCD root Application
+  command: kubectl apply -f /tmp/argocd-root-app.yml
+  become: false
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: argocd_app_apply
+  changed_when: "'unchanged' not in argocd_app_apply.stdout"
+
+- name: Get ArgoCD initial admin password
+  command: kubectl -n {{ argocd_namespace }} get secret argocd-initial-admin-secret -o jsonpath="{.data.password}"
+  become: false
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: argocd_pw_b64
+  changed_when: false
+  failed_when: false
+
+- name: Save ArgoCD admin password to controller
+  delegate_to: localhost
+  become: false
+  copy:
+    content: "{{ argocd_pw_b64.stdout | b64decode }}\n"
+    dest: "{{ playbook_dir }}/../argocd-admin-password"
+    mode: "0600"
+  when: argocd_pw_b64.rc == 0 and argocd_pw_b64.stdout | length > 0

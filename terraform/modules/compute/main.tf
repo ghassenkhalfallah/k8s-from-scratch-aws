@@ -159,10 +159,6 @@ resource "aws_autoscaling_group" "workers" {
     value               = var.cluster_name
     propagate_at_launch = true
   }
-
-  lifecycle {
-    ignore_changes = [desired_capacity]
-  }
 }
 
 # ── Worker IPs (best-effort from current ASG instances) ───────────────────────

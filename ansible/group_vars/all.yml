@@ -7,7 +7,7 @@ pod_cidr: "192.168.0.0/16"
 service_cidr: "10.96.0.0/12"
 service_dns_domain: "cluster.local"
 
-containerd_version: "1.7.*"
+containerd_version: "2.2.*"
 containerd_config_dir: /etc/containerd
 
 calico_version: "v3.27.0"
@@ -16,6 +16,16 @@ calico_manifest_url: "https://raw.githubusercontent.com/projectcalico/calico/{{ 
 ingress_nginx_version: "4.12.0"
 ingress_http_nodeport: 30080
 ingress_https_nodeport: 30443
+
+argocd_version: "10.3.3"
+argocd_namespace: "argocd"
+argocd_http_nodeport: 30090
+argocd_https_nodeport: 30453
+argocd_app_name: "root-app"
+gitops_repo_url: "https://github.com/ghassenkhalfallah/k8s-gitops.git"
+gitops_repo_path: "apps"
+gitops_repo_branch: "main"
+gitops_target_namespace: "default"
 
 kubeadm_config_path: /tmp/kubeadm-config.yaml
 kubeconfig_path: /etc/kubernetes/admin.conf

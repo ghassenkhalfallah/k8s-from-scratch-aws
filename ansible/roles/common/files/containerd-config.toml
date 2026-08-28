@@ -1,16 +1,18 @@
-version = 2
+version = 3
 
 [plugins]
-  [plugins."io.containerd.grpc.v1.cri"]
-    sandbox_image = "registry.k8s.io/pause:3.9"
+  [plugins.'io.containerd.cri.v1.images']
+    [plugins.'io.containerd.cri.v1.images'.pinned_images]
+      sandbox = 'registry.k8s.io/pause:3.9'
 
-    [plugins."io.containerd.grpc.v1.cri".containerd]
-      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes]
-        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
-          runtime_type = "io.containerd.runc.v2"
+  [plugins.'io.containerd.cri.v1.runtime']
+    [plugins.'io.containerd.cri.v1.runtime'.containerd]
+      [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes]
+        [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runc]
+          runtime_type = 'io.containerd.runc.v2'
 
-          [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+          [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runc.options]
             SystemdCgroup = true
 
-  [plugins."io.containerd.internal.v1.opt"]
-    path = "/opt/containerd"
+  [plugins.'io.containerd.internal.v1.opt']
+    path = '/opt/containerd'

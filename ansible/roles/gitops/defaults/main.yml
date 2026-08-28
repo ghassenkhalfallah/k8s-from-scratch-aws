@@ -1,0 +1,10 @@
+---
+argocd_version: "10.3.3"
+argocd_namespace: "argocd"
+argocd_http_nodeport: 30090
+argocd_https_nodeport: 30453
+argocd_app_name: "root-app"
+gitops_repo_url: "https://github.com/ghassenkhalfallah/k8s-gitops.git"
+gitops_repo_path: "apps"
+gitops_repo_branch: "main"
+gitops_target_namespace: "default"

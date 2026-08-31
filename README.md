@@ -11,6 +11,22 @@ A Kubernetes platform built on raw EC2 instances instead of EKS: Terraform provi
 
 ---
 
+## What this proves
+
+Anyone can follow a tutorial to a green `terraform apply`. What's harder to fake — and what this repo is actually evidence of — is what happened *after* that first apply, across the whole stack:
+
+| Skill | Where it shows up |
+|---|---|
+| Debugging IaC state semantics, not just writing HCL that works once | ASG `desired_capacity` silently ignored — [below](#real-problems-solved) |
+| Linux internals: package management, boot races, systemd | dpkg lock-frontend race, containerd apt pin break — [below](#real-problems-solved) |
+| Container runtime internals (CRI, config schema versioning) | containerd v2 → v3 config migration — [below](#real-problems-solved) |
+| Kubernetes networking and ingress troubleshooting | Grafana redirect loop / `root_url` fix — [below](#real-problems-solved) |
+| GitOps operational literacy, not just "installed ArgoCD" | `directory.recurse` bug — reported `Synced`/`Healthy` while syncing nothing — [below](#real-problems-solved) |
+| Production judgment under real constraints | kube-prometheus-stack sized for 3 nodes with no PV provisioner, not defaults — [GitOps flow](#gitops-flow) |
+| Security-conscious design, not "IAM admin and move on" | private subnets, bastion-only SSH, zero IAM roles, generated (never committed) SSH key — [Security notes](#security-notes) |
+
+None of these are things you get from following a guide end to end without deviation — they're what shows up when the guide doesn't match reality and you have to find out why.
+
 ## Why build this by hand
 
 EKS and GKE are the right call for production — but they also hide every part of Kubernetes that's actually worth understanding: what `kubeadm init` does to stand up etcd and the API server, how a CNI actually wires pod-to-pod routing, why kube-proxy matters, what a GitOps controller's reconcile loop looks like when it's *your* cluster drifting. This project does all of that manually, on an AWS account with deliberately restricted permissions (no IAM roles/instance profiles, no NLB, single NAT gateway) — constraints that mirror a real cost-conscious or access-locked-down environment far more than a "click deploy" tutorial does.
@@ -62,7 +78,7 @@ No public API endpoint, no load balancer — every SSH hop and every `kubectl` c
 
 ## Real problems solved
 
-The value here isn't that this works — plenty of tutorials work. It's that this was built and rebuilt against a live AWS account, and here's what broke and why:
+The value here isn't that this works — plenty of tutorials work. It's that this was built and rebuilt against a live AWS account, and these five span five different layers of the stack (package management, IaC lifecycle, container runtime, GitOps reconciliation, ingress networking) — meaning the debugging skill behind them isn't a one-trick pony. Here's what broke and why:
 
 **containerd's apt package jumped major versions mid-project, breaking the pin.** `containerd_version` was pinned to `1.7.*`; a later `apt install` failed because Ubuntu's repo had moved on to `2.2.1` and `1.7.*` was no longer resolvable. Re-pinning to `2.2.*` wasn't enough on its own — containerd 2.x deprecates the old config schema, so `containerd-config.toml` had to be migrated from `version = 2` / `[plugins."io.containerd.grpc.v1.cri"]` to `version = 3` with the CRI config split across `[plugins.'io.containerd.cri.v1.images']` and `[plugins.'io.containerd.cri.v1.runtime']`. Get this wrong and containerd starts but kubelet can't create pod sandboxes.
 
